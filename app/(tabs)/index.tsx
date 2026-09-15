@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '../../services/supabase';
+import { supabase } from '@/services/supabase';
 
 export default function HomeScreen() {
   const [hoTen, setHoTen] = useState('');
@@ -41,7 +41,7 @@ export default function HomeScreen() {
 
       const { data, error } = await supabase
         .from('nguoi_dung')
-        .select('ho_ten')
+        .select('ho_ten, vai_tro')
         .eq('ma_nguoi_dung', user.id)
         .single();
 
@@ -52,6 +52,11 @@ export default function HomeScreen() {
 
       if (data) {
         setHoTen(data.ho_ten);
+        const role = String(data.vai_tro || '').trim();
+        if (role === 'Admin' || role === 'QuanTri') {
+          router.replace('/admin');
+          return;
+        }
       }
     } catch (error) {
       console.log('LOAD USER ERROR:', error);
@@ -148,7 +153,7 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.avatar}
-            onPress={() => router.push('/(tabs)/profile')}
+            onPress={() => router.push('/(tabs)/profile' as any)}
           >
             <Text style={styles.avatarText}>
               {hoTen ? hoTen.charAt(0).toUpperCase() : 'U'}
@@ -211,7 +216,7 @@ export default function HomeScreen() {
 
             <TouchableOpacity
               style={styles.bannerButton}
-              onPress={() => router.push('/(tabs)/search')}
+              onPress={() => router.push('/(tabs)/search' as any)}
             >
               <Text style={styles.bannerButtonText}>
                 Tìm phòng ngay
@@ -229,7 +234,7 @@ export default function HomeScreen() {
           </Text>
 
           <TouchableOpacity
-            onPress={() => router.push('/(tabs)/search')}
+            onPress={() => router.push('/(tabs)/search' as any)}
           >
             <Text style={styles.seeAll}>
               Xem tất cả

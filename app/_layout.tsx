@@ -1,4 +1,3 @@
-
 import { Stack } from 'expo-router';
 
 export default function RootLayout() {
@@ -8,17 +7,11 @@ export default function RootLayout() {
         headerShown: false,
       }}
     >
-      <Stack.Screen name="login" />
-      <Stack.Screen name="register" />
-
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(admin)" />
       <Stack.Screen name="home" />
-      <Stack.Screen name="search" />
-      <Stack.Screen name="favorite" />
-      <Stack.Screen name="profile" />
-
-      <Stack.Screen name="admin" />
-      <Stack.Screen name="chu-tro" />
+      <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }
-

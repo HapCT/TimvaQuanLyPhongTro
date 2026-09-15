@@ -1,12 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,12 +14,53 @@ import {
 } from 'react-native';
 
 import { router } from 'expo-router';
-import { supabase } from '../services/supabase';
+import { supabase } from '@/services/supabase';
+import { styles } from '@/styles/auth/login.styles';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [matKhau, setMatKhau] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // =========================
+  // KIỂM TRA PHIÊN ĐĂNG NHẬP
+  // =========================
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
+
+  const checkExistingSession = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: nguoiDung } = await supabase
+          .from('nguoi_dung')
+          .select('vai_tro')
+          .eq('ma_nguoi_dung', user.id)
+          .maybeSingle();
+
+        const role = String(nguoiDung?.vai_tro || '').trim();
+        if (role === 'Admin' || role === 'QuanTri') {
+          router.replace('/admin');
+          return;
+        } else if (role === 'ChuTro') {
+          router.replace('/chu-tro' as any);
+          return;
+        } else if (role === 'NguoiThue') {
+          router.replace('/home');
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('CHECK SESSION ERROR:', error);
+    } finally {
+      setCheckingSession(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim()) {
@@ -170,7 +210,7 @@ export default function LoginScreen() {
       // ADMIN
       // =========================
 
-      if (vaiTro === 'Admin') {
+      if (vaiTro === 'Admin' || vaiTro === 'QuanTri') {
         console.log(
           '>>> ADMIN LOGIN THÀNH CÔNG'
         );
@@ -201,7 +241,7 @@ export default function LoginScreen() {
 
         setLoading(false);
 
-        router.replace('/chu-tro');
+        router.replace('/chu-tro' as any);
 
         return;
       }
@@ -260,6 +300,21 @@ export default function LoginScreen() {
       setLoading(false);
     }
   };
+
+  if (checkingSession) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#F5F7FA',
+        }}
+      >
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -379,95 +434,4 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
-  },
-
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-
-  box: {
-    width: '100%',
-    maxWidth: 450,
-    backgroundColor: '#FFFFFF',
-    padding: 30,
-    borderRadius: 14,
-
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-
-    elevation: 3,
-  },
-
-  title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#222',
-  },
-
-  subtitle: {
-    fontSize: 14,
-    color: '#888',
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 30,
-  },
-
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 7,
-    color: '#333',
-  },
-
-  input: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#D5D5D5',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 18,
-    color: '#222',
-    backgroundColor: '#FFFFFF',
-  },
-
-  button: {
-    height: 50,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginTop: 5,
-  },
-
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: 'bold',
-  },
-
-  registerText: {
-    textAlign: 'center',
-    marginTop: 20,
-    color: '#007AFF',
-    fontSize: 15,
-  },
-});
 
