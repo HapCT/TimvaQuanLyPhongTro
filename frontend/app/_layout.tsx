@@ -12,6 +12,7 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(admin)" />
+      <Stack.Screen name="chu-tro" />
       <Stack.Screen name="home" />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>

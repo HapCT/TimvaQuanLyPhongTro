@@ -54,7 +54,7 @@ export default function LoginScreen() {
           router.replace('/chu-tro' as any);
           return;
         } else if (role === 'NguoiThue') {
-          router.replace('/home');
+          router.replace('/(tabs)' as any);
           return;
         }
       }
@@ -218,14 +218,6 @@ export default function LoginScreen() {
       // =========================
 
       if (vaiTro === 'ChuTro') {
-        console.log(
-          '>>> CHỦ TRỌ LOGIN THÀNH CÔNG'
-        );
-
-        console.log(
-          '>>> ĐANG ĐIỀU HƯỚNG → /chu-tro'
-        );
-
         setLoading(false);
 
         router.replace('/chu-tro' as any);
@@ -238,17 +230,10 @@ export default function LoginScreen() {
       // =========================
 
       if (vaiTro === 'NguoiThue') {
-        console.log(
-          '>>> NGƯỜI THUÊ LOGIN THÀNH CÔNG'
-        );
-
-        console.log(
-          '>>> ĐANG ĐIỀU HƯỚNG → /home'
-        );
 
         setLoading(false);
 
-        router.replace('/home');
+        router.replace('/(tabs)' as any);
 
         return;
       }
@@ -256,11 +241,6 @@ export default function LoginScreen() {
       // =========================
       // VAI TRÒ KHÔNG HỢP LỆ
       // =========================
-
-      console.log(
-        '>>> VAI TRÒ KHÔNG HỢP LỆ:',
-        vaiTro
-      );
 
       await supabase.auth.signOut();
 
