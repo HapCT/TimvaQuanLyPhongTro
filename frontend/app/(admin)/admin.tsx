@@ -24,7 +24,7 @@ export default function AdminScreen() {
   const [hoTen, setHoTen] = useState('');
   const [loading, setLoading] = useState(true);
   // Mặc định mở ngay tab 'users' để hiển thị toàn bộ danh sách tài khoản
-  const [menu, setMenu] = useState<'users' | 'dashboard' | 'khutro' | 'rooms' | 'tienich' | 'contracts' | 'requests'>('users');
+  const [menu, setMenu] = useState<'users' | 'dashboard' | 'khutro' | 'rooms' | 'tienich' | 'bookings' | 'contracts' | 'reviews' | 'requests'>('users');
   const [userStats, setUserStats] = useState({
     total: 0,
     owners: 0,
@@ -235,12 +235,36 @@ export default function AdminScreen() {
           <TouchableOpacity
             style={[
               styles.mobileNavChip,
+              menu === 'bookings' && styles.mobileNavChipActive,
+            ]}
+            onPress={() => setMenu('bookings')}
+          >
+            <Text style={[styles.mobileNavChipText, menu === 'bookings' && styles.mobileNavChipTextActive]}>
+              Đặt phòng
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.mobileNavChip,
               menu === 'contracts' && styles.mobileNavChipActive,
             ]}
             onPress={() => setMenu('contracts')}
           >
             <Text style={[styles.mobileNavChipText, menu === 'contracts' && styles.mobileNavChipTextActive]}>
-              Hợp đồng
+              Hợp đồng & Thanh toán
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.mobileNavChip,
+              menu === 'reviews' && styles.mobileNavChipActive,
+            ]}
+            onPress={() => setMenu('reviews')}
+          >
+            <Text style={[styles.mobileNavChipText, menu === 'reviews' && styles.mobileNavChipTextActive]}>
+              Đánh giá
             </Text>
           </TouchableOpacity>
 
@@ -252,7 +276,7 @@ export default function AdminScreen() {
             onPress={() => setMenu('requests')}
           >
             <Text style={[styles.mobileNavChipText, menu === 'requests' && styles.mobileNavChipTextActive]}>
-              Yêu cầu
+              Yêu cầu hỗ trợ
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -327,19 +351,35 @@ export default function AdminScreen() {
             </View>
           )}
 
+          {/* BOOKINGS */}
+          {menu === 'bookings' && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Yêu cầu đặt phòng</Text>
+              <Text style={styles.sectionSub}>Quản lý các yêu cầu đặt phòng từ người thuê.</Text>
+            </View>
+          )}
+
           {/* CONTRACTS */}
           {menu === 'contracts' && (
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Danh sách hợp đồng</Text>
-              <Text style={styles.sectionSub}>Quản lý hợp đồng thuê trọ.</Text>
+              <Text style={styles.sectionTitle}>Hợp đồng & Thanh toán</Text>
+              <Text style={styles.sectionSub}>Quản lý hợp đồng thuê trọ và trạng thái thanh toán.</Text>
+            </View>
+          )}
+
+          {/* REVIEWS */}
+          {menu === 'reviews' && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Quản lý đánh giá</Text>
+              <Text style={styles.sectionSub}>Theo dõi đánh giá phòng trọ từ người thuê.</Text>
             </View>
           )}
 
           {/* REQUESTS */}
           {menu === 'requests' && (
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Danh sách yêu cầu</Text>
-              <Text style={styles.sectionSub}>Quản lý các khiếu nại và hỗ trợ.</Text>
+              <Text style={styles.sectionTitle}>Danh sách yêu cầu hỗ trợ</Text>
+              <Text style={styles.sectionSub}>Quản lý các khiếu nại và hỗ trợ từ người dùng.</Text>
             </View>
           )}
         </ScrollView>
@@ -447,7 +487,25 @@ export default function AdminScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* HỢP ĐỒNG */}
+        {/* ĐẶT PHÒNG */}
+        <TouchableOpacity
+          style={[
+            styles.menuItem,
+            menu === 'bookings' && styles.menuItemActive,
+          ]}
+          onPress={() => setMenu('bookings')}
+        >
+          <Text
+            style={[
+              styles.menuText,
+              menu === 'bookings' && styles.menuTextActive,
+            ]}
+          >
+            Yêu cầu đặt phòng
+          </Text>
+        </TouchableOpacity>
+
+        {/* HỢP ĐỒNG & THANH TOÁN */}
         <TouchableOpacity
           style={[
             styles.menuItem,
@@ -461,7 +519,25 @@ export default function AdminScreen() {
               menu === 'contracts' && styles.menuTextActive,
             ]}
           >
-            Hợp đồng
+            Hợp đồng & Thanh toán
+          </Text>
+        </TouchableOpacity>
+
+        {/* ĐÁNH GIÁ */}
+        <TouchableOpacity
+          style={[
+            styles.menuItem,
+            menu === 'reviews' && styles.menuItemActive,
+          ]}
+          onPress={() => setMenu('reviews')}
+        >
+          <Text
+            style={[
+              styles.menuText,
+              menu === 'reviews' && styles.menuTextActive,
+            ]}
+          >
+            Quản lý đánh giá
           </Text>
         </TouchableOpacity>
 
@@ -479,7 +555,7 @@ export default function AdminScreen() {
               menu === 'requests' && styles.menuTextActive,
             ]}
           >
-            Yêu cầu
+            Yêu cầu hỗ trợ
           </Text>
         </TouchableOpacity>
 
@@ -535,8 +611,10 @@ export default function AdminScreen() {
               {menu === 'khutro' && 'Quản lý khu trọ'}
               {menu === 'rooms' && 'Quản lý phòng trọ'}
               {menu === 'tienich' && 'Quản lý tiện ích'}
-              {menu === 'contracts' && 'Quản lý hợp đồng'}
-              {menu === 'requests' && 'Quản lý yêu cầu'}
+              {menu === 'bookings' && 'Quản lý yêu cầu đặt phòng'}
+              {menu === 'contracts' && 'Hợp đồng & Thanh toán'}
+              {menu === 'reviews' && 'Quản lý đánh giá'}
+              {menu === 'requests' && 'Quản lý yêu cầu hỗ trợ'}
             </Text>
 
             <Text style={styles.headerSub}>
@@ -616,13 +694,37 @@ export default function AdminScreen() {
           </View>
         )}
 
+        {/* BOOKINGS */}
+        {menu === 'bookings' && (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Yêu cầu đặt phòng</Text>
+                <Text style={styles.sectionSub}>Theo dõi và duyệt các yêu cầu đặt phòng từ người thuê.</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* CONTRACTS */}
         {menu === 'contracts' && (
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>Danh sách hợp đồng</Text>
-                <Text style={styles.sectionSub}>Quản lý toàn bộ hợp đồng thuê trọ.</Text>
+                <Text style={styles.sectionTitle}>Hợp đồng & Thanh toán</Text>
+                <Text style={styles.sectionSub}>Quản lý toàn bộ hợp đồng thuê trọ và lịch sử thanh toán.</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* REVIEWS */}
+        {menu === 'reviews' && (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Quản lý đánh giá</Text>
+                <Text style={styles.sectionSub}>Theo dõi và phản hồi các đánh giá từ người thuê.</Text>
               </View>
             </View>
           </View>
@@ -633,8 +735,8 @@ export default function AdminScreen() {
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <View>
-                <Text style={styles.sectionTitle}>Danh sách yêu cầu</Text>
-                <Text style={styles.sectionSub}>Quản lý các yêu cầu và phản hồi từ người dùng.</Text>
+                <Text style={styles.sectionTitle}>Yêu cầu hỗ trợ</Text>
+                <Text style={styles.sectionSub}>Quản lý các yêu cầu hỗ trợ và khiếu nại từ người dùng.</Text>
               </View>
             </View>
           </View>

@@ -57,12 +57,12 @@ export default function RegisterScreen() {
       return;
     }
 
-    const phoneRegex = /^0(3|5|7|8|9)[0-9]{8}$/;
+    const phoneRegex = /^0[0-9]{9}$/;
 
     if (!phoneRegex.test(soDienThoai.trim())) {
       Alert.alert(
         'Số điện thoại không hợp lệ',
-        'Vui lòng nhập số điện thoại Việt Nam gồm 10 chữ số.\n\nVí dụ: 0987654321'
+        'Vui lòng nhập số điện thoại gồm 10 chữ số bắt đầu bằng 0.\n\nVí dụ: 0987654321'
       );
       return;
     }

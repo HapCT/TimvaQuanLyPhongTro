@@ -41,15 +41,14 @@ export default function LoginScreen() {
           .from('nguoi_dung')
           .select('vai_tro')
           .eq('ma_nguoi_dung', user.id)
-          .maybeSingle();
-
         const role = String(nguoiDung?.vai_tro || '').trim();
         if (role === 'Admin' || role === 'QuanTri') {
-          if (Platform.OS === 'web') {
-            router.replace('/admin');
-          } else {
-            router.replace('/home');
+          if (Platform.OS !== 'web') {
+            await supabase.auth.signOut();
+            Alert.alert('Thông báo', 'Tài khoản Admin chỉ được phép đăng nhập trên máy tính (Web).');
+            return;
           }
+          router.replace('/admin');
           return;
         } else if (role === 'ChuTro') {
           router.replace('/chu-tro' as any);
@@ -215,6 +214,16 @@ export default function LoginScreen() {
       // =========================
 
       if (vaiTro === 'Admin' || vaiTro === 'QuanTri') {
+        if (Platform.OS !== 'web') {
+          await supabase.auth.signOut();
+          Alert.alert(
+            'Không hỗ trợ',
+            'Tài khoản Admin chỉ được phép đăng nhập trên máy tính (Web).'
+          );
+          setLoading(false);
+          return;
+        }
+
         console.log(
           '>>> ADMIN LOGIN THÀNH CÔNG'
         );
@@ -225,11 +234,7 @@ export default function LoginScreen() {
 
         setLoading(false);
 
-        if (Platform.OS === 'web') {
-          router.replace('/admin');
-        } else {
-          router.replace('/home');
-        }
+        router.replace('/admin');
 
         return;
       }
