@@ -14,12 +14,15 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import { styles } from '@/styles/admin/admin-users.styles';
+import { backendApi } from '@/services/backend';
+import { showAlert } from '@/utils/alert';
 
 type User = {
   ma_nguoi_dung: string;
   ho_ten: string;
   so_dien_thoai: string;
   vai_tro: 'NguoiThue' | 'ChuTro' | 'QuanTri';
+  is_locked?: boolean;
 };
 
 export default function AdminUsersScreen() {
@@ -101,29 +104,11 @@ export default function AdminUsersScreen() {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('nguoi_dung')
-        .select(
-          'ma_nguoi_dung, ho_ten, so_dien_thoai, vai_tro'
-        )
-        .order('ho_ten', {
-          ascending: true,
-        });
-
-      if (error) {
-        console.log('GET USERS ERROR:', error);
-
-        Alert.alert(
-          'Lỗi',
-          'Không thể tải danh sách người dùng.'
-        );
-
-        return;
-      }
-
-      setUsers(data || []);
+      const response = await backendApi.get('/api/users');
+      setUsers(response.data || []);
     } catch (error) {
       console.log('GET USERS ERROR:', error);
+      showAlert('Lỗi', 'Không thể tải danh sách người dùng.');
     } finally {
       setLoading(false);
     }
@@ -225,73 +210,52 @@ export default function AdminUsersScreen() {
   };
 
   // ==========================================
-  // XÓA NGƯỜI DÙNG
+  // KHÓA / MỞ KHÓA NGƯỜI DÙNG
   // ==========================================
 
-  const deleteUser = async (user: User) => {
-    Alert.alert(
-      'Xóa người dùng',
-      `Bạn có chắc muốn xóa "${user.ho_ten}" không?`,
+  const toggleLockUser = async (user: User) => {
+    const isLocking = !user.is_locked;
+    const actionText = isLocking ? 'Khóa' : 'Mở khóa';
+    
+    showAlert(
+      `${actionText} người dùng`,
+      `Bạn có chắc muốn ${actionText.toLowerCase()} tài khoản "${user.ho_ten}" không?`,
       [
         {
           text: 'Hủy',
           style: 'cancel',
         },
         {
-          text: 'Xóa',
-          style: 'destructive',
+          text: actionText,
+          style: isLocking ? 'destructive' : 'default',
           onPress: async () => {
             try {
               const {
                 data: { user: currentUser },
               } = await supabase.auth.getUser();
 
-              // Không cho Admin tự xóa chính mình
-              if (
-                currentUser?.id ===
-                user.ma_nguoi_dung
-              ) {
-                Alert.alert(
-                  'Không thể xóa',
-                  'Bạn không thể tự xóa tài khoản Admin đang đăng nhập.'
+              // Không cho Admin tự khóa chính mình
+              if (currentUser?.id === user.ma_nguoi_dung) {
+                showAlert(
+                  'Không hợp lệ',
+                  'Bạn không thể tự khóa tài khoản Admin đang đăng nhập.'
                 );
-
                 return;
               }
 
-              const { error } = await supabase
-                .from('nguoi_dung')
-                .delete()
-                .eq(
-                  'ma_nguoi_dung',
-                  user.ma_nguoi_dung
-                );
+              await backendApi.put(`/api/users/${user.ma_nguoi_dung}/toggle-lock`, {
+                is_locked: isLocking
+              });
 
-              if (error) {
-                console.log(
-                  'DELETE USER ERROR:',
-                  error
-                );
-
-                Alert.alert(
-                  'Lỗi',
-                  'Không thể xóa người dùng. Có thể người dùng đang có dữ liệu liên quan.'
-                );
-
-                return;
-              }
-
-              Alert.alert(
+              showAlert(
                 'Thành công',
-                'Đã xóa người dùng.'
+                `Đã ${actionText.toLowerCase()} người dùng.`
               );
 
               getUsers();
             } catch (error) {
-              console.log(
-                'DELETE USER ERROR:',
-                error
-              );
+              console.log('TOGGLE LOCK USER ERROR:', error);
+              showAlert('Lỗi', `Không thể ${actionText.toLowerCase()} người dùng.`);
             }
           },
         },
@@ -674,6 +638,12 @@ export default function AdminUsersScreen() {
                     {getRoleName(user.vai_tro)}
                   </Text>
                 </View>
+                
+                {user.is_locked && (
+                  <View style={[styles.roleBadge, { backgroundColor: '#ffe5e5', marginLeft: 8 }]}>
+                    <Text style={[styles.roleText, { color: '#d32f2f' }]}>🔒 Bị khóa</Text>
+                  </View>
+                )}
 
                 {/* ACTION */}
 
@@ -728,11 +698,11 @@ export default function AdminUsersScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => deleteUser(user)}
+                    style={[styles.deleteButton, user.is_locked ? { backgroundColor: '#4CAF50' } : {}]}
+                    onPress={() => toggleLockUser(user)}
                   >
                     <Text style={styles.deleteButtonText}>
-                      Xóa
+                      {user.is_locked ? 'Mở khóa' : 'Khóa'}
                     </Text>
                   </TouchableOpacity>
                 </View>

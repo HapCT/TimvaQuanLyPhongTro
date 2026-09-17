@@ -8,20 +8,23 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import UsersManagement from '@/components/admin/UsersManagement';
+import RoomsManagement from '@/components/admin/RoomsManagement';
+import KhuTroManagement from '@/components/admin/KhuTroManagement';
+import TienIchManagement from '@/components/admin/TienIchManagement';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import { styles } from '@/styles/admin/admin.styles';
+import { showAlert } from '@/utils/alert';
 
 export default function AdminScreen() {
   const [hoTen, setHoTen] = useState('');
   const [loading, setLoading] = useState(true);
   // Mặc định mở ngay tab 'users' để hiển thị toàn bộ danh sách tài khoản
-  const [menu, setMenu] = useState<'users' | 'dashboard' | 'rooms' | 'contracts' | 'requests'>('users');
+  const [menu, setMenu] = useState<'users' | 'dashboard' | 'khutro' | 'rooms' | 'tienich' | 'contracts' | 'requests'>('users');
   const [userStats, setUserStats] = useState({
     total: 0,
     owners: 0,
@@ -55,7 +58,7 @@ export default function AdminScreen() {
       const user = authData?.user;
 
       if (authError || !user) {
-        Alert.alert(
+        showAlert(
           'Chưa đăng nhập',
           'Vui lòng đăng nhập bằng tài khoản quản trị.'
         );
@@ -74,7 +77,7 @@ export default function AdminScreen() {
         .maybeSingle();
 
       if (error || !data) {
-        Alert.alert(
+        showAlert(
           'Lỗi tài khoản',
           'Không tìm thấy thông tin tài khoản trong hệ thống.'
         );
@@ -85,7 +88,7 @@ export default function AdminScreen() {
       const vaiTro = String(data.vai_tro || '').trim();
 
       if (vaiTro !== 'Admin' && vaiTro !== 'QuanTri') {
-        Alert.alert(
+        showAlert(
           'Không có quyền',
           `Tài khoản hiện tại có vai trò "${vaiTro}", không phải Quản trị viên.`
         );
@@ -96,7 +99,7 @@ export default function AdminScreen() {
       setHoTen(data.ho_ten || 'Quản trị viên');
     } catch (error) {
       console.log('ADMIN CATCH ERROR:', error);
-      Alert.alert('Lỗi', 'Có lỗi xảy ra khi tải trang quản trị.');
+      showAlert('Lỗi', 'Có lỗi xảy ra khi tải trang quản trị.');
       router.replace('/login');
     } finally {
       setLoading(false);
@@ -113,7 +116,7 @@ export default function AdminScreen() {
       router.replace('/login');
     } catch (error) {
       console.log('LOGOUT ERROR:', error);
-      Alert.alert('Lỗi', 'Có lỗi xảy ra khi đăng xuất.');
+      showAlert('Lỗi', 'Có lỗi xảy ra khi đăng xuất.');
     } finally {
       setLoading(false);
     }
@@ -196,12 +199,36 @@ export default function AdminScreen() {
           <TouchableOpacity
             style={[
               styles.mobileNavChip,
+              menu === 'khutro' && styles.mobileNavChipActive,
+            ]}
+            onPress={() => setMenu('khutro')}
+          >
+            <Text style={[styles.mobileNavChipText, menu === 'khutro' && styles.mobileNavChipTextActive]}>
+              Khu trọ
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.mobileNavChip,
               menu === 'rooms' && styles.mobileNavChipActive,
             ]}
             onPress={() => setMenu('rooms')}
           >
             <Text style={[styles.mobileNavChipText, menu === 'rooms' && styles.mobileNavChipTextActive]}>
               Phòng trọ
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.mobileNavChip,
+              menu === 'tienich' && styles.mobileNavChipActive,
+            ]}
+            onPress={() => setMenu('tienich')}
+          >
+            <Text style={[styles.mobileNavChipText, menu === 'tienich' && styles.mobileNavChipTextActive]}>
+              Tiện ích
             </Text>
           </TouchableOpacity>
 
@@ -278,18 +305,25 @@ export default function AdminScreen() {
               </View>
 
 
-              {/* Danh sách tài khoản hiển thị ngay trên Dashboard */}
               <View style={styles.sectionCard}>
-                <UsersManagement onStatsUpdate={setUserStats} />
+                <Text style={{ textAlign: 'center', color: '#666', fontStyle: 'italic', padding: 20 }}>
+                  Các biểu đồ và thống kê phòng trọ, khu trọ sẽ được cập nhật trong tương lai...
+                </Text>
               </View>
+            </View>
+          )}
+
+          {/* KHU TRỌ */}
+          {menu === 'khutro' && (
+            <View style={styles.sectionCard}>
+              <KhuTroManagement />
             </View>
           )}
 
           {/* ROOMS */}
           {menu === 'rooms' && (
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Danh sách phòng trọ</Text>
-              <Text style={styles.sectionSub}>Quản lý toàn bộ phòng trọ trên hệ thống.</Text>
+              <RoomsManagement />
             </View>
           )}
 
@@ -359,6 +393,24 @@ export default function AdminScreen() {
           </Text>
         </TouchableOpacity>
 
+        {/* KHU TRỌ */}
+        <TouchableOpacity
+          style={[
+            styles.menuItem,
+            menu === 'khutro' && styles.menuItemActive,
+          ]}
+          onPress={() => setMenu('khutro')}
+        >
+          <Text
+            style={[
+              styles.menuText,
+              menu === 'khutro' && styles.menuTextActive,
+            ]}
+          >
+            Khu trọ
+          </Text>
+        </TouchableOpacity>
+
         {/* PHÒNG TRỌ */}
         <TouchableOpacity
           style={[
@@ -374,6 +426,24 @@ export default function AdminScreen() {
             ]}
           >
             Phòng trọ
+          </Text>
+        </TouchableOpacity>
+
+        {/* TIỆN ÍCH */}
+        <TouchableOpacity
+          style={[
+            styles.menuItem,
+            menu === 'tienich' && styles.menuItemActive,
+          ]}
+          onPress={() => setMenu('tienich')}
+        >
+          <Text
+            style={[
+              styles.menuText,
+              menu === 'tienich' && styles.menuTextActive,
+            ]}
+          >
+            Tiện ích
           </Text>
         </TouchableOpacity>
 
@@ -462,7 +532,9 @@ export default function AdminScreen() {
             <Text style={styles.headerTitle}>
               {menu === 'users' && 'Quản lý tài khoản người dùng'}
               {menu === 'dashboard' && 'Tổng quan hệ thống'}
+              {menu === 'khutro' && 'Quản lý khu trọ'}
               {menu === 'rooms' && 'Quản lý phòng trọ'}
+              {menu === 'tienich' && 'Quản lý tiện ích'}
               {menu === 'contracts' && 'Quản lý hợp đồng'}
               {menu === 'requests' && 'Quản lý yêu cầu'}
             </Text>
@@ -515,26 +587,32 @@ export default function AdminScreen() {
             </View>
 
 
-            {/* Danh sách tài khoản hiển thị ngay trên Dashboard */}
             <View style={styles.sectionCard}>
-              <UsersManagement onStatsUpdate={setUserStats} />
+              <Text style={{ textAlign: 'center', color: '#666', fontStyle: 'italic', padding: 20 }}>
+                Các biểu đồ và thống kê phòng trọ, khu trọ sẽ được cập nhật trong tương lai...
+              </Text>
             </View>
+          </View>
+        )}
+
+        {/* KHU TRỌ */}
+        {menu === 'khutro' && (
+          <View style={styles.sectionCard}>
+            <KhuTroManagement />
           </View>
         )}
 
         {/* ROOMS */}
         {menu === 'rooms' && (
           <View style={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Danh sách phòng trọ</Text>
-                <Text style={styles.sectionSub}>Quản lý toàn bộ phòng trọ trên hệ thống.</Text>
-              </View>
+            <RoomsManagement />
+          </View>
+        )}
 
-              <TouchableOpacity style={styles.primaryButton}>
-                <Text style={styles.primaryButtonText}>+ Thêm phòng</Text>
-              </TouchableOpacity>
-            </View>
+        {/* TIỆN ÍCH */}
+        {menu === 'tienich' && (
+          <View style={styles.sectionCard}>
+            <TienIchManagement />
           </View>
         )}
 

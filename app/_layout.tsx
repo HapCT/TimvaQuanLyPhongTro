@@ -1,7 +1,9 @@
 import { Stack } from 'expo-router';
+import CustomAlert, { customAlertRef } from '@/components/CustomAlert';
 
 export default function RootLayout() {
   return (
+    <>
     <Stack
       screenOptions={{
         headerShown: false,
@@ -13,5 +15,7 @@ export default function RootLayout() {
       <Stack.Screen name="home" />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>
+    <CustomAlert ref={customAlertRef} />
+    </>
   );
 }

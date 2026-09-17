@@ -9,6 +9,7 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
@@ -16,6 +17,7 @@ import { supabase } from '@/services/supabase';
 export default function HomeScreen() {
   const [hoTen, setHoTen] = useState('');
   const [loading, setLoading] = useState(true);
+  const [authChecking, setAuthChecking] = useState(true);
   const [search, setSearch] = useState('');
 
   const [rooms, setRooms] = useState<any[]>([]);
@@ -54,12 +56,22 @@ export default function HomeScreen() {
         setHoTen(data.ho_ten);
         const role = String(data.vai_tro || '').trim();
         if (role === 'Admin' || role === 'QuanTri') {
-          router.replace('/admin');
-          return;
+          if (Platform.OS === 'web') {
+            router.replace('/admin');
+            return;
+          } else {
+            // Trên điện thoại, Admin sẽ bị coi như một Người Dùng bình thường để trải nghiệm App
+            setAuthChecking(false);
+            return;
+          }
         }
       }
+      
+      // Nếu là user thường, cho phép render màn hình
+      setAuthChecking(false);
     } catch (error) {
-      console.log('LOAD USER ERROR:', error);
+      console.log('LỖI KIỂM TRA QUYỀN:', error);
+      setAuthChecking(false);
     }
   };
 
@@ -134,6 +146,14 @@ export default function HomeScreen() {
     await supabase.auth.signOut();
     router.replace('/login');
   };
+
+  if (authChecking) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

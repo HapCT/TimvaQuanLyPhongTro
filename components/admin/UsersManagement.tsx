@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Image,
@@ -12,8 +11,10 @@ import {
 } from 'react-native';
 
 import { supabase } from '@/services/supabase';
+import { backendApi } from '@/services/backend';
 import { User, RoleFilter } from '@/types';
 import { styles } from '@/styles/admin/users-management.styles';
+import { showAlert } from '@/utils/alert';
 
 interface UsersManagementProps {
   onStatsUpdate?: (stats: { total: number; owners: number; tenants: number; admins: number }) => void;
@@ -53,24 +54,11 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('nguoi_dung')
-        .select('*')
-        .order('ngay_tao', { ascending: false });
-
-      if (error) {
-        const fallback = await supabase.from('nguoi_dung').select('*');
-        if (fallback.error) {
-          Alert.alert('Lỗi', 'Không thể tải danh sách: ' + fallback.error.message);
-          return;
-        }
-        setUsers((fallback.data || []) as User[]);
-        return;
-      }
-      setUsers((data || []) as User[]);
+      const response = await backendApi.get('/api/users');
+      setUsers(response.data || []);
     } catch (e) {
       console.log('LOAD USERS ERROR:', e);
-      Alert.alert('Lỗi', 'Có lỗi xảy ra khi tải danh sách người dùng.');
+      showAlert('Lỗi', 'Có lỗi xảy ra khi tải danh sách người dùng.');
     } finally {
       setLoading(false);
     }
@@ -109,38 +97,41 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
     });
   }, [users, search, roleFilter]);
 
-  const deleteUser = (user: User) => {
+  const toggleLockUser = async (user: User) => {
     if (user.ma_nguoi_dung === currentAdminId) {
-      Alert.alert('Không thể thực hiện', 'Bạn không thể xóa tài khoản Admin đang đăng nhập.');
+      showAlert('Không hợp lệ', 'Bạn không thể tự khóa tài khoản của chính mình.');
       return;
     }
 
-    Alert.alert(
-      'Xóa người dùng',
-      `Bạn có chắc muốn xóa "${user.ho_ten || 'người dùng này'}" không?`,
+    const isLocking = !user.is_locked;
+    const actionText = isLocking ? 'Khóa' : 'Mở khóa';
+
+    showAlert(
+      `${actionText} tài khoản`,
+      `Bạn có chắc muốn ${actionText.toLowerCase()} tài khoản "${user.ho_ten || 'này'}" không?`,
       [
         { text: 'Hủy', style: 'cancel' },
         {
-          text: 'Xóa',
-          style: 'destructive',
+          text: actionText,
+          style: isLocking ? 'destructive' : 'default',
           onPress: async () => {
             try {
               setDeletingId(user.ma_nguoi_dung);
-              const { error } = await supabase.from('nguoi_dung').delete().eq('ma_nguoi_dung', user.ma_nguoi_dung);
-              if (error) {
-                Alert.alert('Lỗi', 'Không thể xóa người dùng: ' + error.message);
-                return;
-              }
-              setUsers((prev) => prev.filter((u) => u.ma_nguoi_dung !== user.ma_nguoi_dung));
-              Alert.alert('Thành công', 'Đã xóa người dùng thành công.');
-            } catch (e) {
-              console.log('DELETE ERROR:', e);
-              Alert.alert('Lỗi', 'Có lỗi xảy ra khi xóa người dùng.');
+              await backendApi.put(`/api/users/${user.ma_nguoi_dung}/toggle-lock`, {
+                is_locked: isLocking
+              });
+              
+              showAlert('Thành công', `Đã ${actionText.toLowerCase()} tài khoản.`);
+              loadUsers();
+            } catch (e: any) {
+              console.log('TOGGLE LOCK ERROR:', e);
+              const msg = e.response?.data?.error || `Có lỗi xảy ra khi ${actionText.toLowerCase()} người dùng.`;
+              showAlert('Lỗi', msg);
             } finally {
               setDeletingId(null);
             }
-          },
-        },
+          }
+        }
       ]
     );
   };
@@ -152,18 +143,26 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
     return Number.isNaN(d.getTime()) ? '--' : d.toLocaleDateString('vi-VN');
   };
 
-  const getRoleInfo = (role: string | null) => {
-    switch (role) {
-      case 'NguoiThue':
-        return { text: 'Người thuê', badgeStyle: styles.roleNguoiThue };
-      case 'ChuTro':
-        return { text: 'Chủ trọ', badgeStyle: styles.roleChuTro };
-      case 'Admin':
-      case 'QuanTri':
-        return { text: 'Quản trị viên', badgeStyle: styles.roleAdmin };
-      default:
-        return { text: role || 'Chưa xác định', badgeStyle: styles.roleUnknown };
+  const getRoleInfo = (user: User) => {
+    const roleObj = (() => {
+      switch (user.vai_tro) {
+        case 'NguoiThue':
+          return { text: 'Người thuê', badgeStyle: styles.roleNguoiThue };
+        case 'ChuTro':
+          return { text: 'Chủ trọ', badgeStyle: styles.roleChuTro };
+        case 'Admin':
+        case 'QuanTri':
+          return { text: 'Quản trị viên', badgeStyle: styles.roleAdmin };
+        default:
+          return { text: user.vai_tro || 'Chưa xác định', badgeStyle: styles.roleUnknown };
+      }
+    })();
+
+    if (user.is_locked) {
+      return { text: '🔒 Bị khóa', badgeStyle: { backgroundColor: '#FEE2E2' } };
     }
+    
+    return roleObj;
   };
 
   const renderAvatar = (user: User) => (
@@ -183,14 +182,16 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
       </View>
     ) : (
       <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => deleteUser(user)}
+        style={[styles.deleteButton, user.is_locked ? { backgroundColor: '#E0F2FE', borderColor: '#BAE6FD' } : {}]}
+        onPress={() => toggleLockUser(user)}
         disabled={deletingId === user.ma_nguoi_dung}
       >
         {deletingId === user.ma_nguoi_dung ? (
-          <ActivityIndicator size="small" color="#E53935" />
+          <ActivityIndicator size="small" color={user.is_locked ? "#0284C7" : "#E53935"} />
         ) : (
-          <Text style={styles.deleteText}>Xóa</Text>
+          <Text style={[styles.deleteText, user.is_locked ? { color: '#0369A1' } : {}]}>
+            {user.is_locked ? 'Mở khóa' : 'Khóa'}
+          </Text>
         )}
       </TouchableOpacity>
     )
@@ -309,7 +310,7 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
         /* DẠNG THẺ (MOBILE) */
         <View style={styles.mobileCardList}>
           {filteredUsers.map((user) => {
-            const role = getRoleInfo(user.vai_tro);
+            const role = getRoleInfo(user);
             const isCurrentAdmin = user.ma_nguoi_dung === currentAdminId;
             return (
               <View key={user.ma_nguoi_dung} style={styles.mobileUserCard}>
@@ -321,7 +322,7 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
                     {isCurrentAdmin && <Text style={styles.currentAdminText}>Tài khoản của bạn</Text>}
                   </View>
                   <View style={[styles.roleBadge, role.badgeStyle]}>
-                    <Text style={styles.roleBadgeText}>{role.text}</Text>
+                    <Text style={[styles.roleBadgeText, user.is_locked ? { color: '#DC2626' } : {}]}>{role.text}</Text>
                   </View>
                 </View>
 
@@ -360,7 +361,6 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
             </View>
 
             {filteredUsers.map((user) => {
-              const role = getRoleInfo(user.vai_tro);
               const isCurrentAdmin = user.ma_nguoi_dung === currentAdminId;
               return (
                 <View key={user.ma_nguoi_dung} style={styles.tableRow}>
@@ -373,9 +373,17 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
                     {user.so_dien_thoai || 'Chưa cập nhật'}
                   </Text>
                   <View style={[styles.roleColumn, styles.cell]}>
-                    <View style={[styles.roleBadge, role.badgeStyle]}>
-                      <Text style={styles.roleBadgeText}>{role.text}</Text>
-                    </View>
+                    {(() => {
+                      const info = getRoleInfo(user);
+                      return (
+                        <View style={[styles.roleBadge, info.badgeStyle]}>
+                          <Text style={[
+                            styles.roleBadgeText,
+                            user.is_locked ? { color: '#DC2626' } : {}
+                          ]}>{info.text}</Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                   <Text style={[styles.dateColumn, styles.cell, styles.dateText]}>{formatDate(user.ngay_tao)}</Text>
                   <View style={[styles.actionColumn, styles.cell, styles.actionCell]}>{renderAction(user)}</View>

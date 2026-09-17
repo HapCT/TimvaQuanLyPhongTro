@@ -45,7 +45,11 @@ export default function LoginScreen() {
 
         const role = String(nguoiDung?.vai_tro || '').trim();
         if (role === 'Admin' || role === 'QuanTri') {
-          router.replace('/admin');
+          if (Platform.OS === 'web') {
+            router.replace('/admin');
+          } else {
+            router.replace('/home');
+          }
           return;
         } else if (role === 'ChuTro') {
           router.replace('/chu-tro' as any);
@@ -221,7 +225,11 @@ export default function LoginScreen() {
 
         setLoading(false);
 
-        router.replace('/admin');
+        if (Platform.OS === 'web') {
+          router.replace('/admin');
+        } else {
+          router.replace('/home');
+        }
 
         return;
       }
