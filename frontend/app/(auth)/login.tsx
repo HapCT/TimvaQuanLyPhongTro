@@ -2,20 +2,20 @@
 import React, { useEffect, useState } from 'react';
 
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import { styles } from '@/styles/auth/login.styles';
+import { router } from 'expo-router';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -102,11 +102,6 @@ export default function LoginScreen() {
         password: matKhau,
       });
 
-      console.log('=========================');
-      console.log('LOGIN ERROR:', authError);
-      console.log('AUTH USER:', authData.user);
-      console.log('=========================');
-
       if (authError) {
         Alert.alert(
           'Đăng nhập thất bại',
@@ -145,20 +140,6 @@ export default function LoginScreen() {
         )
         .maybeSingle();
 
-      console.log('=========================');
-      console.log(
-        'AUTH USER ID:',
-        authData.user.id
-      );
-      console.log(
-        'NGUOI DUNG:',
-        nguoiDung
-      );
-      console.log(
-        'ROLE ERROR:',
-        roleError
-      );
-      console.log('=========================');
 
       // =========================
       // KHÔNG TÌM THẤY NGƯỜI DÙNG
@@ -189,13 +170,6 @@ export default function LoginScreen() {
         nguoiDung.vai_tro || ''
       ).trim();
 
-      console.log('=========================');
-      console.log('VAI TRÒ THỰC TẾ:', vaiTro);
-      console.log(
-        'HO TÊN:',
-        nguoiDung.ho_ten
-      );
-      console.log('=========================');
 
       if (!vaiTro) {
         await supabase.auth.signOut();
@@ -395,7 +369,7 @@ export default function LoginScreen() {
             style={[
               styles.button,
               loading &&
-                styles.buttonDisabled,
+              styles.buttonDisabled,
             ]}
             onPress={handleLogin}
             disabled={loading}

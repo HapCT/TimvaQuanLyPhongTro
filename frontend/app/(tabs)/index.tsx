@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
+import { backendApi } from '@/services/backend';
 
 export default function HomeScreen() {
   const [hoTen, setHoTen] = useState('');
@@ -80,44 +81,10 @@ export default function HomeScreen() {
   // =========================
   const loadRooms = async () => {
     try {
-      /*
-       * Tạm thời dùng dữ liệu mẫu.
-       *
-       * Khi bảng phòng_trọ của bạn hoàn thiện,
-       * chúng ta sẽ thay phần này bằng Supabase.
-       */
-
-      const demoRooms = [
-        {
-          id: 1,
-          ten: 'Phòng trọ gần trường đại học',
-          diaChi: 'Mỹ Hào, Hưng Yên',
-          gia: '2.500.000',
-          dienTich: '25 m²',
-          image:
-            'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267',
-        },
-        {
-          id: 2,
-          ten: 'Phòng trọ đầy đủ nội thất',
-          diaChi: 'Nhân Hòa, Mỹ Hào',
-          gia: '3.000.000',
-          dienTich: '30 m²',
-          image:
-            'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85',
-        },
-        {
-          id: 3,
-          ten: 'Phòng trọ giá rẻ',
-          diaChi: 'Bần Yên Nhân, Hưng Yên',
-          gia: '1.800.000',
-          dienTich: '20 m²',
-          image:
-            'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2',
-        },
-      ];
-
-      setRooms(demoRooms);
+      const response = await backendApi.get('/api/phong-tro');
+      if (response.data && response.data.rooms) {
+        setRooms(response.data.rooms);
+      }
     } catch (error) {
       console.log('LOAD ROOMS ERROR:', error);
     } finally {
@@ -134,8 +101,9 @@ export default function HomeScreen() {
     if (!keyword) return true;
 
     return (
-      room.ten.toLowerCase().includes(keyword) ||
-      room.diaChi.toLowerCase().includes(keyword)
+      (room.tieu_de || '').toLowerCase().includes(keyword) ||
+      (room.khu_tro?.dia_chi || '').toLowerCase().includes(keyword) ||
+      (room.khu_tro?.thanh_pho || '').toLowerCase().includes(keyword)
     );
   });
 
@@ -280,14 +248,14 @@ export default function HomeScreen() {
         ) : (
           filteredRooms.map((room) => (
             <TouchableOpacity
-              key={room.id}
+              key={room.ma_phong}
               style={styles.roomCard}
               onPress={() => {
                 console.log('CHỌN PHÒNG:', room);
               }}
             >
               <Image
-                source={{ uri: room.image }}
+                source={{ uri: room.anh_dai_dien || 'https://via.placeholder.com/300x200?text=No+Image' }}
                 style={styles.roomImage}
               />
 
@@ -296,23 +264,23 @@ export default function HomeScreen() {
                   style={styles.roomName}
                   numberOfLines={2}
                 >
-                  {room.ten}
+                  {room.tieu_de || `Phòng ${room.so_phong}`}
                 </Text>
 
                 <Text
                   style={styles.roomAddress}
                   numberOfLines={1}
                 >
-                  📍 {room.diaChi}
+                  📍 {[room.khu_tro?.quan_huyen, room.khu_tro?.thanh_pho].filter(Boolean).join(', ') || 'Chưa rõ'}
                 </Text>
 
                 <View style={styles.roomBottom}>
                   <Text style={styles.roomPrice}>
-                    {room.gia} đ/tháng
+                    {room.gia_thue?.toLocaleString('vi-VN')} đ/tháng
                   </Text>
 
                   <Text style={styles.roomArea}>
-                    {room.dienTich}
+                    {room.dien_tich ? `${room.dien_tich} m²` : '--'}
                   </Text>
                 </View>
               </View>
