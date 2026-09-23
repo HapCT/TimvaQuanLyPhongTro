@@ -182,9 +182,90 @@ const remove = async (req, res) => {
   }
 };
 
+const getById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: phong, error } = await supabaseAdmin
+      .from('phong_tro')
+      .select('*')
+      .eq('ma_phong', id)
+      .maybeSingle();
+
+    if (error || !phong) {
+      return res.status(404).json({ error: 'Không tìm thấy phòng trọ' });
+    }
+
+    let khuTro = null;
+    let tenChuTro = null;
+    let soDienThoaiChuTro = null;
+
+    if (phong.ma_khu_tro) {
+      const { data: kt } = await supabaseAdmin
+        .from('khu_tro')
+        .select('*')
+        .eq('ma_khu_tro', phong.ma_khu_tro)
+        .maybeSingle();
+      khuTro = kt;
+
+      if (kt && kt.ma_chu_tro) {
+        const { data: chuTro } = await supabaseAdmin
+          .from('nguoi_dung')
+          .select('ho_ten, so_dien_thoai')
+          .eq('ma_nguoi_dung', kt.ma_chu_tro)
+          .maybeSingle();
+
+        if (chuTro) {
+          tenChuTro = chuTro.ho_ten;
+          soDienThoaiChuTro = chuTro.so_dien_thoai;
+        }
+      }
+    }
+
+    const { data: anhData } = await supabaseAdmin
+      .from('anh_phong')
+      .select('*')
+      .eq('ma_phong', id);
+
+    const danhSachAnh = (anhData || []).sort((a, b) =>
+      a.anh_chinh === b.anh_chinh ? 0 : a.anh_chinh ? -1 : 1
+    );
+
+    const { data: ptiData } = await supabaseAdmin
+      .from('phong_tien_ich')
+      .select('ma_tien_ich')
+      .eq('ma_phong', id);
+
+    let danhSachTienIch = [];
+    if (ptiData && ptiData.length > 0) {
+      const ids = ptiData.map((p) => p.ma_tien_ich);
+      const { data: tiData } = await supabaseAdmin
+        .from('tien_ich')
+        .select('*')
+        .in('ma_tien_ich', ids);
+      danhSachTienIch = tiData || [];
+    }
+
+    res.json({
+      room: {
+        ...phong,
+        khu_tro: khuTro,
+        ten_chu_tro: tenChuTro || 'Chủ nhà trọ',
+        so_dien_thoai_chu_tro: soDienThoaiChuTro || khuTro?.so_dien_thoai || '0901234567',
+        danh_sach_anh: danhSachAnh,
+        danh_sach_tien_ich: danhSachTienIch,
+      },
+    });
+  } catch (error) {
+    console.error('LỖI GET BY ID:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAll,
+  getById,
   create,
   update,
-  remove
+  remove,
 };

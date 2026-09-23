@@ -12,10 +12,12 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(admin)" />
-      <Stack.Screen name="home" />
+      <Stack.Screen name="(landlord)" />
+      <Stack.Screen name="room/[id]" />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>
     <CustomAlert ref={customAlertRef} />
     </>
   );
 }
+

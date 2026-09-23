@@ -90,4 +90,44 @@ export const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 15,
   },
+
+  errorBox: {
+    backgroundColor: '#FFF2F0',
+    borderWidth: 1,
+    borderColor: '#FFCCC7',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  errorText: {
+    color: '#FF4D4F',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 20,
+  },
+
+  successBox: {
+    backgroundColor: '#F6FFED',
+    borderWidth: 1,
+    borderColor: '#B7EB8F',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  successText: {
+    color: '#52C41A',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 20,
+  },
 });

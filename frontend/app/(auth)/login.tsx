@@ -22,6 +22,8 @@ export default function LoginScreen() {
   const [matKhau, setMatKhau] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // =========================
   // KIỂM TRA PHIÊN ĐĂNG NHẬP
@@ -37,11 +39,12 @@ export default function LoginScreen() {
       } = await supabase.auth.getUser();
 
       if (user) {
-        const { data: nguoiDung } = await supabase
+        const { data: nguoiDungArr } = await supabase
           .from('nguoi_dung')
           .select('vai_tro')
           .eq('ma_nguoi_dung', user.id)
-        const role = String(nguoiDung?.vai_tro || '').trim();
+          .maybeSingle();
+        const role = String((nguoiDungArr as any)?.vai_tro || '').trim();
         if (role === 'Admin' || role === 'QuanTri') {
           if (Platform.OS !== 'web') {
             await supabase.auth.signOut();
@@ -51,10 +54,10 @@ export default function LoginScreen() {
           router.replace('/admin');
           return;
         } else if (role === 'ChuTro') {
-          router.replace('/chu-tro' as any);
+          router.replace('/(landlord)' as any);
           return;
         } else if (role === 'NguoiThue') {
-          router.replace('/home');
+          router.replace('/(tabs)');
           return;
         }
       }
@@ -66,20 +69,23 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
     if (!email.trim()) {
-      Alert.alert('Thông báo', 'Vui lòng nhập email.');
+      setErrorMessage('Vui lòng nhập địa chỉ email.');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Thông báo', 'Email không hợp lệ.');
+      setErrorMessage('Địa chỉ email không đúng định dạng. Ví dụ: user@example.com');
       return;
     }
 
     if (!matKhau) {
-      Alert.alert('Thông báo', 'Vui lòng nhập mật khẩu.');
+      setErrorMessage('Vui lòng nhập mật khẩu.');
       return;
     }
 
@@ -93,7 +99,6 @@ export default function LoginScreen() {
       // =========================
       // ĐĂNG NHẬP SUPABASE AUTH
       // =========================
-
       const {
         data: authData,
         error: authError,
@@ -103,21 +108,21 @@ export default function LoginScreen() {
       });
 
       if (authError) {
-        Alert.alert(
-          'Đăng nhập thất bại',
-          'Email hoặc mật khẩu không chính xác.'
-        );
-
+        let msg = 'Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!';
+        if (authError.message?.toLowerCase().includes('invalid login credentials')) {
+          msg = 'Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!';
+        } else if (authError.message?.toLowerCase().includes('email not confirmed')) {
+          msg = 'Email chưa được xác thực. Vui lòng kiểm tra hộp thư!';
+        } else if (authError.message) {
+          msg = authError.message;
+        }
+        setErrorMessage(msg);
         setLoading(false);
         return;
       }
 
       if (!authData.user) {
-        Alert.alert(
-          'Lỗi',
-          'Không tìm thấy thông tin tài khoản.'
-        );
-
+        setErrorMessage('Không tìm thấy thông tin tài khoản đăng nhập.');
         setLoading(false);
         return;
       }
@@ -125,165 +130,74 @@ export default function LoginScreen() {
       // =========================
       // LẤY THÔNG TIN NGƯỜI DÙNG
       // =========================
-
       const {
         data: nguoiDung,
         error: roleError,
       } = await supabase
         .from('nguoi_dung')
-        .select(
-          'ma_nguoi_dung, ho_ten, vai_tro'
-        )
-        .eq(
-          'ma_nguoi_dung',
-          authData.user.id
-        )
+        .select('ma_nguoi_dung, ho_ten, vai_tro')
+        .eq('ma_nguoi_dung', authData.user.id)
         .maybeSingle();
 
-
-      // =========================
-      // KHÔNG TÌM THẤY NGƯỜI DÙNG
-      // =========================
-
       if (roleError || !nguoiDung) {
-        console.log(
-          'LỖI LẤY NGƯỜI DÙNG:',
-          roleError
-        );
-
+        console.log('LỖI LẤY NGƯỜI DÙNG:', roleError);
         await supabase.auth.signOut();
-
-        Alert.alert(
-          'Lỗi tài khoản',
-          'Không tìm thấy thông tin người dùng trong hệ thống.'
-        );
-
+        setErrorMessage('Không tìm thấy thông tin hồ sơ người dùng trong hệ thống.');
         setLoading(false);
         return;
       }
 
-      // =========================
-      // KIỂM TRA VAI TRÒ
-      // =========================
-
-      const vaiTro = String(
-        nguoiDung.vai_tro || ''
-      ).trim();
-
+      const vaiTro = String(nguoiDung.vai_tro || '').trim();
 
       if (!vaiTro) {
         await supabase.auth.signOut();
-
-        Alert.alert(
-          'Lỗi tài khoản',
-          'Tài khoản chưa được thiết lập vai trò.'
-        );
-
+        setErrorMessage('Tài khoản chưa được thiết lập vai trò.');
         setLoading(false);
         return;
       }
 
-      // =========================
-      // ADMIN
-      // =========================
+      // THÔNG BÁO CHÀO MỪNG
+      const hoTen = nguoiDung.ho_ten || 'bạn';
+      let roleLabel = 'Khách thuê';
+      if (vaiTro === 'Admin' || vaiTro === 'QuanTri') roleLabel = 'Quản trị viên';
+      else if (vaiTro === 'ChuTro') roleLabel = 'Chủ nhà trọ';
 
-      if (vaiTro === 'Admin' || vaiTro === 'QuanTri') {
-        if (Platform.OS !== 'web') {
-          await supabase.auth.signOut();
-          Alert.alert(
-            'Không hỗ trợ',
-            'Tài khoản Admin chỉ được phép đăng nhập trên máy tính (Web).'
-          );
-          setLoading(false);
+      const welcomeMsg = `🎉 Đăng nhập thành công! Chào mừng ${hoTen} (${roleLabel})`;
+      setSuccessMessage(welcomeMsg);
+      setErrorMessage(null);
+
+      // ĐIỀU HƯỚNG THEO VAI TRÒ
+      setTimeout(() => {
+        setLoading(false);
+
+        if (vaiTro === 'Admin' || vaiTro === 'QuanTri') {
+          if (Platform.OS !== 'web') {
+            supabase.auth.signOut();
+            setErrorMessage('Tài khoản Admin chỉ được phép đăng nhập trên máy tính (Web).');
+            setSuccessMessage(null);
+            return;
+          }
+          router.replace('/admin');
           return;
         }
 
-        console.log(
-          '>>> ADMIN LOGIN THÀNH CÔNG'
-        );
+        if (vaiTro === 'ChuTro') {
+          router.replace('/(landlord)' as any);
+          return;
+        }
 
-        console.log(
-          '>>> ĐANG ĐIỀU HƯỚNG → /admin'
-        );
+        if (vaiTro === 'NguoiThue') {
+          router.replace('/(tabs)');
+          return;
+        }
 
-        setLoading(false);
+        setErrorMessage(`Vai trò "${vaiTro}" không hợp lệ.`);
+      }, 750);
 
-        router.replace('/admin');
-
-        return;
-      }
-
-      // =========================
-      // CHỦ TRỌ
-      // =========================
-
-      if (vaiTro === 'ChuTro') {
-        console.log(
-          '>>> CHỦ TRỌ LOGIN THÀNH CÔNG'
-        );
-
-        console.log(
-          '>>> ĐANG ĐIỀU HƯỚNG → /chu-tro'
-        );
-
-        setLoading(false);
-
-        router.replace('/chu-tro' as any);
-
-        return;
-      }
-
-      // =========================
-      // NGƯỜI THUÊ
-      // =========================
-
-      if (vaiTro === 'NguoiThue') {
-        console.log(
-          '>>> NGƯỜI THUÊ LOGIN THÀNH CÔNG'
-        );
-
-        console.log(
-          '>>> ĐANG ĐIỀU HƯỚNG → /home'
-        );
-
-        setLoading(false);
-
-        router.replace('/home');
-
-        return;
-      }
-
-      // =========================
-      // VAI TRÒ KHÔNG HỢP LỆ
-      // =========================
-
-      console.log(
-        '>>> VAI TRÒ KHÔNG HỢP LỆ:',
-        vaiTro
-      );
-
+    } catch (error: any) {
+      console.log('LOGIN CATCH ERROR:', error);
       await supabase.auth.signOut();
-
-      Alert.alert(
-        'Lỗi tài khoản',
-        `Vai trò "${vaiTro}" không hợp lệ.`
-      );
-
-      setLoading(false);
-
-    } catch (error) {
-      console.log(
-        'LOGIN CATCH ERROR:',
-        error
-      );
-
-      await supabase.auth.signOut();
-
-      Alert.alert(
-        'Lỗi',
-        'Có lỗi xảy ra trong quá trình đăng nhập. Vui lòng thử lại.'
-      );
-
+      setErrorMessage(error?.message || 'Có lỗi xảy ra trong quá trình đăng nhập. Vui lòng thử lại.');
       setLoading(false);
     }
   };
@@ -329,8 +243,23 @@ export default function LoginScreen() {
             Tìm & Quản lý Phòng Trọ
           </Text>
 
-          {/* EMAIL */}
+          {/* THÔNG BÁO LỖI NẾU CÓ */}
+          {errorMessage && (
+            <View style={styles.errorBox}>
+              <Text style={{ fontSize: 16 }}>⚠️</Text>
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          )}
 
+          {/* THÔNG BÁO CHÀO MỪNG NẾU THÀNH CÔNG */}
+          {successMessage && (
+            <View style={styles.successBox}>
+              <Text style={{ fontSize: 16 }}>✅</Text>
+              <Text style={styles.successText}>{successMessage}</Text>
+            </View>
+          )}
+
+          {/* EMAIL */}
           <Text style={styles.label}>
             Email
           </Text>
@@ -340,7 +269,10 @@ export default function LoginScreen() {
             placeholder="Nhập email"
             placeholderTextColor="#888"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (errorMessage) setErrorMessage(null);
+            }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -348,7 +280,6 @@ export default function LoginScreen() {
           />
 
           {/* MẬT KHẨU */}
-
           <Text style={styles.label}>
             Mật khẩu
           </Text>
@@ -358,7 +289,10 @@ export default function LoginScreen() {
             placeholder="Nhập mật khẩu"
             placeholderTextColor="#888"
             value={matKhau}
-            onChangeText={setMatKhau}
+            onChangeText={(text) => {
+              setMatKhau(text);
+              if (errorMessage) setErrorMessage(null);
+            }}
             secureTextEntry
             editable={!loading}
           />

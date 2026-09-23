@@ -6,6 +6,7 @@ const khuTroRoutes = require('./routes/khuTroRoutes');
 const phongTroRoutes = require('./routes/phongTroRoutes');
 const userRoutes = require('./routes/userRoutes');
 const tienIchRoutes = require('./routes/tienIchRoutes');
+const datLichRoutes = require('./routes/datLichRoutes');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -19,6 +20,7 @@ app.use('/api/khu-tro', khuTroRoutes);
 app.use('/api/phong-tro', phongTroRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tien-ich', tienIchRoutes);
+app.use('/api/dat-lich', datLichRoutes);
 
 // Route mặc định kiểm tra health
 app.get('/', (req, res) => {

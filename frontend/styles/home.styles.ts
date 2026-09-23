@@ -125,8 +125,7 @@ export const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: 'bold',
     color: '#222',
-    marginTop: 30,
-    marginBottom: 5,
+    marginBottom: 4,
   },
 
   sectionDescription: {
@@ -138,8 +137,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginTop: 5,
-    marginBottom: 15,
+    marginTop: 25,
+    marginBottom: 16,
   },
 
   seeAll: {
@@ -153,6 +152,7 @@ export const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     gap: 14,
+    marginTop: 12,
   },
 
   filterMobile: {
@@ -197,8 +197,9 @@ export const styles = StyleSheet.create({
   roomGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 15,
+    justifyContent: 'flex-start',
+    gap: 16,
+    marginBottom: 15,
   },
 
   roomCard: {

@@ -69,7 +69,7 @@ export default function Header() {
         {/* LOGO */}
         <TouchableOpacity
           style={styles.logoContainer}
-          onPress={() => navigate('/home')}
+          onPress={() => navigate('/(tabs)')}
         >
           <View style={styles.logo}>
             <Text style={styles.logoIcon}>🏠</Text>
@@ -92,7 +92,7 @@ export default function Header() {
             <View style={styles.navigation}>
               <TouchableOpacity
                 style={styles.navItem}
-                onPress={() => navigate('/home')}
+                onPress={() => navigate('/(tabs)')}
               >
                 <Text style={styles.activeNavText}>
                   Trang chủ
@@ -101,7 +101,7 @@ export default function Header() {
 
               <TouchableOpacity
                 style={styles.navItem}
-                onPress={() => navigate('/search')}
+                onPress={() => navigate('/(tabs)/explore')}
               >
                 <Text style={styles.navText}>
                   Tìm phòng
@@ -132,7 +132,7 @@ export default function Header() {
             <View style={styles.rightArea}>
               <TouchableOpacity
                 style={styles.userButton}
-                onPress={() => navigate('/profile')}
+                onPress={() => navigate('/(tabs)/profile')}
               >
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
@@ -206,7 +206,7 @@ export default function Header() {
 
           <TouchableOpacity
             style={styles.mobileItem}
-            onPress={() => navigate('/home')}
+            onPress={() => navigate('/(tabs)')}
           >
             <Text style={styles.mobileIcon}>🏠</Text>
             <Text style={styles.mobileText}>
@@ -216,7 +216,7 @@ export default function Header() {
 
           <TouchableOpacity
             style={styles.mobileItem}
-            onPress={() => navigate('/search')}
+            onPress={() => navigate('/(tabs)/explore')}
           >
             <Text style={styles.mobileIcon}>🔍</Text>
             <Text style={styles.mobileText}>
@@ -236,7 +236,7 @@ export default function Header() {
 
           <TouchableOpacity
             style={styles.mobileItem}
-            onPress={() => navigate('/profile')}
+            onPress={() => navigate('/(tabs)/profile')}
           >
             <Text style={styles.mobileIcon}>👤</Text>
             <Text style={styles.mobileText}>

@@ -1,0 +1,207 @@
+================================================================================
+BÁO CÁO ĐÁNH GIÁ TIẾN TRÌNH, LỖI SAI VÀ KẾ HOẠCH THỰC HIỆN DỰ ÁN
+ĐỀ TÀI: XÂY DỰNG HỆ THỐNG ĐA NỀN TẢNG TÌM KIẾM VÀ QUẢN LÝ PHÒNG TRỌ
+Thời gian rà soát: 2026-09-23
+Công nghệ sử dụng: Frontend (Expo 54, React Native, TypeScript) - Backend (Node.js/Express, Supabase)
+================================================================================
+
+PHẦN 1: TỔNG QUAN TIẾN TRÌNH HIỆN TẠI (DỰ ÁN ĐANG Ở ĐÂU?)
+--------------------------------------------------------------------------------
+1. Phía Backend (Node.js/Express + Supabase): Đạt ~50%
+   - Đã cấu hình Express, CORS, Dotenv và Supabase Client (sử dụng service role key).
+   - Đã có 4 nhóm Routes và Controllers:
+     + phongTroController.js: Lấy danh sách phòng (kèm khu trọ, ảnh, tiện ích), thêm, sửa, xóa phòng.
+     + khuTroController.js: CRUD khu trọ.
+     + tienIchController.js: CRUD tiện ích và liên kết phòng - tiện ích.
+     + userController.js: Lấy danh sách người dùng, xóa người dùng, khóa/mở khóa tài khoản (qua Supabase Auth Admin).
+   - Còn thiếu: API đặt lịch hẹn xem phòng, API đánh giá/bình luận, API thống kê doanh thu/tình trạng phòng cho chủ trọ, API tìm kiếm/lọc nâng cao ở server.
+
+2. Phía Xác thực & Phân quyền (Auth): Đạt ~75%
+   - Đã có màn hình Đăng ký (app/(auth)/register.tsx) cho phép chọn vai trò: Người thuê (NguoiThue), Chủ trọ (ChuTro).
+   - Đã có màn hình Đăng nhập (app/(auth)/login.tsx) kiểm tra quyền hạn chuyển hướng.
+
+3. Phía Giao diện Quản trị viên (Admin): Đạt ~60%
+   - Đã có giao diện Admin Dashboard responsive Web và Mobile (app/(admin)/admin.tsx).
+   - Đã tích hợp các component quản lý: UsersManagement, KhuTroManagement, RoomsManagement, TienIchManagement.
+   - Các tab còn lại (Đặt phòng - bookings, Hợp đồng - contracts, Đánh giá - reviews, Hỗ trợ - requests) mới chỉ là giao diện khung (placeholder), chưa có code xử lý.
+
+4. Phía Giao diện Người thuê trọ (Tenant): Đạt ~35%
+   - Đã có màn hình danh sách phòng trọ cơ bản hiển thị giá, diện tích, địa chỉ.
+   - CHƯA CÓ màn hình chi tiết phòng (Room Detail) để xem ảnh, mô tả, liên hệ chủ trọ.
+   - CHƯA CÓ bộ lọc phòng trọ thực tế (mới chỉ lọc từ khóa đơn giản).
+   - CHƯA CÓ tính năng Đặt lịch xem phòng, Lưu phòng yêu thích, Quản lý tài khoản cá nhân.
+
+5. Phía Giao diện Chủ trọ (Landlord Portal): Đạt 0%
+   - HOÀN TOÀN CHƯA CÓ giao diện riêng cho Chủ trọ quản lý khu trọ và phòng trọ của chính mình.
+
+
+================================================================================
+PHẦN 2: CHI TIẾT TẤT CẢ CÁC LỖI SAI VÀ ĐIỂM BẤT HỢP LÝ TRONG CODE
+--------------------------------------------------------------------------------
+
+[LỖI 1 - NGHIÊM TRỌNG]: ĐIỀU HƯỚNG SANG ROUTE KHÔNG TỒN TẠI KHI CHỦ TRỌ ĐĂNG NHẬP
+- Vị trí: frontend/app/(auth)/login.tsx (dòng 53-55 và dòng 231)
+- Đoạn mã lỗi:
+    if (vaiTro === 'ChuTro') {
+      router.replace('/chu-tro' as any);
+      return;
+    }
+- Nguyên nhân: Trong toàn bộ thư mục app/ hoàn toàn KHÔNG CÓ file nào tên là chu-tro.tsx hay thư mục chu-tro/.
+- Hậu quả: Khi bất kỳ tài khoản Chủ trọ nào đăng nhập thành công, app sẽ crash hoặc hiển thị màn hình lỗi "Unmatched Route".
+
+[LỖI 2 - NGHIÊM TRỌNG]: XUNG ĐỘT GIAO DIỆN VÀ MẤT THANH ĐIỀU HƯỚNG DƯỚI (BOTTOM TABS)
+- Vị trí 1: Tồn tại cùng lúc 2 file có nội dung tương tự nhau:
+    + frontend/app/(tabs)/index.tsx (màn hình chính trong Tab Navigation)
+    + frontend/app/home.tsx (màn hình nằm ngoài Tab Navigation)
+- Vị trí 2: frontend/app/(auth)/login.tsx (dòng 57 và dòng 247):
+    if (vaiTro === 'NguoiThue') {
+      router.replace('/home');
+    }
+- Hậu quả: Khi người thuê đăng nhập, app chuyển về /home khiến toàn bộ thanh điều hướng Bottom Tabs bị mất. Người dùng bị kẹt lại màn hình này, không bấm chuyển tab được.
+
+[LỖI 3 - LỖI ROUTING]: GỌI TỚI CÁC ROUTE CHƯA ĐƯỢC TẠO
+- Vị trí: frontend/app/(tabs)/index.tsx
+    + Dòng 144: router.push('/(tabs)/profile' as any) -> Chưa có file profile.tsx trong thư mục app/(tabs)/
+    + Dòng 207, 225: router.push('/(tabs)/search' as any) -> Chưa có file search.tsx trong thư mục app/(tabs)/
+- Hậu quả: Người dùng bấm vào avatar hoặc nút "Tìm phòng ngay", "Xem tất cả" sẽ bị văng lỗi.
+
+[LỖI 4 - THIẾU TÍNH NĂNG CỐT LÕI]: BẤM VÀO THẺ PHÒNG TRỌ KHÔNG CÓ PHẢN HỒI
+- Vị trí: frontend/app/(tabs)/index.tsx (dòng 253-255)
+- Đoạn mã:
+    <TouchableOpacity
+      key={room.ma_phong}
+      onPress={() => {
+        console.log('CHỌN PHÒNG:', room);
+      }}
+    >
+- Hậu quả: Người dùng bấm vào phòng trọ chỉ in ra console, không mở ra màn hình chi tiết phòng trọ (Room Detail). Người thuê không thể xem danh sách ảnh đầy đủ, tiện ích, nội quy, tiền điện/nước và số điện thoại chủ trọ.
+
+[LỖI 5 - LỖI MẠNG ĐA NỀN TẢNG]: HARDCODE LOCALHOST TRONG FILE CẤU HÌNH API
+- Vị trí: frontend/services/backend.ts (dòng 4)
+- Đoạn mã:
+    export const BACKEND_URL = 'http://localhost:3000';
+- Hậu quả: Chạy trên Web máy tính thì gọi được API. Nhưng khi mở app trên điện thoại thật bằng Expo Go, điện thoại sẽ tự gọi vào chính nó (localhost của điện thoại) dẫn đến lỗi kết nối "Network Error" và không tải được dữ liệu phòng. Cần phải cấu hình IP mạng LAN (ví dụ http://192.168.x.x:3000).
+
+[LỖI 6 - MÃ NGUỒN RÁC]: TAB EXPLORE VẪN LÀ MÃ MẪU CỦA EXPO
+- Vị trí: frontend/app/(tabs)/explore.tsx
+- Hiện trạng: Toàn bộ file này chứa mã ParallaxScrollView demo của Expo (giới thiệu file-based routing, animations, light/dark mode) chứ không phục vụ gì cho đề tài quản lý phòng trọ. Cần được chuyển đổi thành màn hình Tìm kiếm & Lọc phòng trọ.
+
+[LỖI 7 - RÀNG BUỘC PHÂN QUYỀN CỨNG BẤT HỢP LÝ]: CHẶN ADMIN ĐĂNG NHẬP TRÊN MOBILE
+- Vị trí: frontend/app/(auth)/login.tsx (dòng 46-50 và dòng 191-199)
+- Đoạn mã:
+    if (vaiTro === 'Admin' || vaiTro === 'QuanTri') {
+      if (Platform.OS !== 'web') {
+        Alert.alert('Không hỗ trợ', 'Tài khoản Admin chỉ được phép đăng nhập trên máy tính (Web).');
+        return;
+      }
+    }
+- Bất hợp lý: Trong khi file app/(admin)/admin.tsx tác giả đã kỳ công viết cả giao diện Responsive cho Mobile (dòng 140: if (isMobile) { ... }), nhưng tại file login lại chặn đứng không cho Admin đăng nhập trên Mobile!
+
+[LỖI 8 - CÁC TAB PLACEHOLDER TRỐNG TRONG ADMIN]:
+- Vị trí: frontend/app/(admin)/admin.tsx (dòng 354 - 384)
+- Các menu: "bookings" (Đặt phòng), "contracts" (Hợp đồng), "reviews" (Đánh giá), "requests" (Yêu cầu) hiện tại chỉ là các khối View rỗng chứa dòng chữ giới thiệu, chưa hề có logic quản lý.
+
+[LỖI 9 - THIẾU CÁC BẢNG CƠ SỞ DỮ LIỆU CẦN THIẾT]:
+- Cơ sở dữ liệu hiện tại mới chỉ có: nguoi_dung, khu_tro, phong_tro, anh_phong, tien_ich, phong_tien_ich.
+- Để làm đúng đề tài "Tìm kiếm & Quản lý phòng trọ", hệ thống đang THIẾU các bảng sau trên Supabase:
+  1. dat_lich_xem (Lưu thông tin khách hẹn xem phòng: ngày giờ, SĐT, ghi chú, trạng thái Duyệt/Từ chối).
+  2. danh_gia (Lưu đánh giá số sao, bình luận của khách về phòng trọ).
+  3. yeu_thich (Lưu danh sách các phòng trọ mà người dùng đã bấm tim/yêu thích).
+  4. hop_dong (Lưu thông tin phòng nào đang cho ai thuê, ngày bắt đầu, ngày kết thúc, tiền cọc).
+
+
+================================================================================
+PHẦN 3: KẾ HOẠCH HÀNH ĐỘNG CHI TIẾT (ROADMAP 5 GIAI ĐOẠN)
+--------------------------------------------------------------------------------
+
+GIAI ĐOẠN 1: DỌN DẸP LỖI ROUTING VÀ CHUẨN HÓA KIẾN TRÚC (Ưu tiên làm ngay)
+- Bước 1.1: Gộp nội dung từ app/home.tsx vào app/(tabs)/index.tsx, sau đó xóa app/home.tsx để tránh trùng lặp.
+- Bước 1.2: Sửa app/(auth)/login.tsx để khi người thuê đăng nhập sẽ điều hướng về /(tabs) thay vì /home.
+- Bước 1.3: Cấu hình lại BACKEND_URL linh hoạt theo địa chỉ IP máy chủ để chạy được trên cả Web và điện thoại thật qua Expo Go.
+- Bước 1.4: Biến đổi app/(tabs)/explore.tsx thành trang Tìm kiếm (Search) & Lọc phòng trọ.
+- Bước 1.5: Tạo thêm file app/(tabs)/profile.tsx để hiển thị thông tin tài khoản người dùng và nút Đăng xuất.
+- Bước 1.6: Cập nhật app/(tabs)/_layout.tsx hiển thị 3 tab rõ ràng: Trang chủ, Tìm kiếm, Tài khoản.
+
+GIAI ĐOẠN 2: HOÀN THIỆN PHÂN HỆ NGƯỜI THUÊ (TENANT)
+- Bước 2.1: Tạo màn hình Chi tiết phòng trọ: app/room/[id].tsx.
+  + Hiển thị slider xem toàn bộ album ảnh.
+  + Hiển thị thông số: Giá thuê, tiền cọc, diện tích, tình trạng phòng.
+  + Hiển thị danh sách tiện ích có biểu tượng trực quan.
+  + Hiển thị thông tin liên hệ chủ trọ (kèm nút Bấm để gọi điện).
+- Bước 2.2: Xây dựng bộ lọc phòng trọ tại trang Explore:
+  + Lọc theo khoảng giá (Ví dụ: < 2 triệu, 2 - 4 triệu, > 4 triệu).
+  + Lọc theo quận/huyện hoặc khu vực.
+  + Lọc theo tiện ích (Máy lạnh, gác xép, giờ tự do, máy giặt...).
+- Bước 2.3: Tạo bảng yeu_thich và tính năng Lưu phòng trọ yêu thích (bấm nút thả tim).
+
+GIAI ĐOẠN 3: XÂY DỰNG PHÂN HỆ DÀNH RIÊNG CHO CHỦ TRỌ (LANDLORD PORTAL)
+- Bước 3.1: Tạo thư mục app/(landlord)/ và màn hình trang chủ chủ trọ app/(landlord)/index.tsx.
+- Bước 3.2: Viết logic lọc: Chủ trọ chỉ thấy và quản lý các khu trọ, phòng trọ do chính họ sở hữu (theo ma_chu_tro).
+- Bước 3.3: Cho phép chủ trọ:
+  + Thêm/sửa phòng trọ của mình.
+  + Đổi nhanh trạng thái phòng: Còn trống <-> Đã cho thuê.
+  + Xem danh sách khách đặt lịch hẹn xem phòng để bấm "Chấp nhận" hoặc "Hủy".
+- Bước 3.4: Sửa login.tsx để tài khoản Chủ trọ đăng nhập sẽ vào thẳng app/(landlord).
+
+GIAI ĐOẠN 4: NÂNG CẤP CSDL VÀ HOÀN THIỆN ADMIN DASHBOARD
+- Bước 4.1: Tạo các bảng trên Supabase: dat_lich_xem, danh_gia, hop_dong.
+- Bước 4.2: Viết các API tương ứng trong backend.
+- Bước 4.3: Hoàn thiện nốt 4 tab đang để trống trong trang Admin (Quản lý đặt phòng, Hợp đồng, Đánh giá, Thống kê).
+- Bước 4.4: Bỏ giới hạn chặn Admin trên Mobile trong login.tsx để kiểm tra được cả trên Web lẫn điện thoại.
+
+GIAI ĐOẠN 5: KIỂM THỬ ĐA NỀN TẢNG VÀ CHUẨN BỊ BÁO CÁO BTL
+- Bước 5.1: Kiểm thử đồng thời trên 2 nền tảng:
+  + Web (Chrome/Edge trên máy tính)
+  + Mobile (Android / iOS qua Expo Go)
+- Bước 5.2: Chuẩn bị 3 tài khoản thử nghiệm cố định để báo cáo với giảng viên:
+  + Admin: admin@tro.vn (Mật khẩu: 123456)
+  + Chủ trọ: chutro@tro.vn (Mật khẩu: 123456)
+  + Người thuê: nguoithue@tro.vn (Mật khẩu: 123456)
+- Bước 5.3: Trích xuất sơ đồ CSDL (ERD) và sơ đồ luồng người dùng (Use Case) phục vụ viết báo cáo Word/Slide.
+
+
+================================================================================
+PHẦN 4: BỘ PROMPT MẪU ĐỂ BẠN ĐƯA VÀO LÀM TỪNG BƯỚC
+--------------------------------------------------------------------------------
+
+Khi bạn cần AI code từng phần, hãy copy chính xác từng prompt dưới đây:
+
+--- PROMPT 1: SỬA LỖI ĐIỀU HƯỚNG VÀ CHUẨN HÓA HỆ THỐNG TAB ---
+"Hãy giúp tôi thực hiện Giai đoạn 1 của dự án phòng trọ:
+1. Gộp toàn bộ mã từ file app/home.tsx vào app/(tabs)/index.tsx, sau đó xóa file app/home.tsx để thống nhất màn hình chính nằm trong nhóm tab.
+2. Sửa file app/(auth)/login.tsx: khi tài khoản có vai trò 'NguoiThue' đăng nhập thành công thì điều hướng về '/(tabs)' thay vì '/home'.
+3. Chuyển đổi file app/(tabs)/explore.tsx (hiện là mã demo của Expo) thành trang Tìm kiếm phòng trọ có thanh search và các nút bộ lọc giá/khu vực.
+4. Tạo file app/(tabs)/profile.tsx hiển thị thông tin người dùng đang đăng nhập và nút Đăng xuất.
+5. Cập nhật app/(tabs)/_layout.tsx để hiển thị 3 tab với icon tương ứng: 'Trang chủ' (house.fill), 'Tìm kiếm' (magnifyingglass), 'Tài khoản' (person.fill)."
+
+--- PROMPT 2: TẠO MÀN HÌNH CHI TIẾT PHÒNG TRỌ (ROOM DETAIL) ---
+"Hãy xây dựng màn hình chi tiết phòng trọ tại file app/room/[id].tsx cho dự án Expo 54:
+1. Đọc tham số id phòng từ expo-router (useLocalSearchParams).
+2. Gọi API lấy dữ liệu phòng (kèm danh sách ảnh, tiện ích, thông tin khu trọ và chủ trọ).
+3. Thiết kế giao diện chi tiết:
+   - Header có nút mũi tên quay lại trang trước.
+   - Album ảnh phòng trọ có thể vuốt ngang (ScrollView horizontal hoặc Image slider).
+   - Hiển thị nổi bật: Giá thuê, tiền cọc, diện tích, trạng thái (Còn trống / Đã thuê).
+   - Địa chỉ chi tiết kèm biểu tượng bản đồ.
+   - Danh sách tiện ích hiển thị dưới dạng badge/tag có icon.
+   - Thông tin chủ trọ: Họ tên, số điện thoại.
+4. Thanh Bottom cố định ở dưới đáy:
+   - Nút 'Gọi điện' (dùng Linking.openURL('tel:...'))
+   - Nút 'Đặt lịch xem phòng' (mở Modal cho nhập ngày giờ và ghi chú)."
+
+--- PROMPT 3: XÂY DỰNG PHÂN HỆ DÀNH CHO CHỦ TRỌ (LANDLORD PORTAL) ---
+"Hãy xây dựng phân hệ giao diện dành cho Chủ trọ trong thư mục app/(landlord)/:
+1. Tạo layout app/(landlord)/_layout.tsx và trang chính app/(landlord)/index.tsx.
+2. Khi Chủ trọ đăng nhập, chỉ hiển thị danh sách các khu trọ và phòng trọ có ma_chu_tro trùng với mã người dùng hiện tại.
+3. Cho phép chủ trọ:
+   - Bấm nút bật/tắt nhanh trạng thái phòng: 'Còn trống' <-> 'Đã thuê'.
+   - Mở modal thêm phòng mới hoặc sửa thông tin phòng hiện có.
+   - Xem thống kê số phòng đang trống và số phòng đã có người ở.
+4. Sửa lại login.tsx để khi vaiTro === 'ChuTro' sẽ tự động điều hướng vào '/(landlord)'."
+
+--- PROMPT 4: HOÀN THIỆN CÁC TÍNH NĂNG ĐẶT PHÒNG VÀ ADMIN DASHBOARD ---
+"Hãy tạo tính năng Đặt lịch hẹn xem phòng và kết nối vào Admin Dashboard:
+1. Cung cấp câu lệnh SQL để tạo bảng 'dat_lich_xem' trên Supabase gồm: id, ma_phong, ma_nguoi_thue, ngay_hen, gio_hen, so_dien_thoai, ghi_chu, trang_thai (ChoXacNhan, DaXacNhan, DaHuy).
+2. Tạo API backend trong phongTroRoutes và phongTroController để thêm mới và lấy danh sách yêu cầu đặt lịch.
+3. Hoàn thiện tab 'bookings' trong app/(admin)/admin.tsx để Admin có thể xem toàn bộ danh sách khách đặt lịch và bấm nút Duyệt / Hủy."
+================================================================================
