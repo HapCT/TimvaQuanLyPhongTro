@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -337,12 +338,23 @@ export default function ProfileScreen() {
         <Text style={styles.footerNote}>© 2026 Hệ thống Quản lý và Tìm kiếm Phòng trọ</Text>
       </View>
     </ScrollView>
+=======
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+
+export default function ProfileScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.text}>Màn hình cá nhân đang được phát triển...</Text>
+    </View>
+>>>>>>> de48903ed550643542b229580638f9bfc52d4866
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+<<<<<<< HEAD
     backgroundColor: '#F5F7FB',
   },
   scrollContent: {
@@ -644,5 +656,14 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     marginBottom: 30,
+=======
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  text: {
+    fontSize: 16,
+    color: '#64748B',
+>>>>>>> de48903ed550643542b229580638f9bfc52d4866
   },
 });

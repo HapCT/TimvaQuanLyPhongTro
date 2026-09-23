@@ -57,7 +57,11 @@ export default function LoginScreen() {
           router.replace('/(landlord)' as any);
           return;
         } else if (role === 'NguoiThue') {
+<<<<<<< HEAD
           router.replace('/(tabs)');
+=======
+          router.replace('/(tabs)' as any);
+>>>>>>> de48903ed550643542b229580638f9bfc52d4866
           return;
         }
       }
@@ -191,11 +195,50 @@ export default function LoginScreen() {
           return;
         }
 
+<<<<<<< HEAD
         setErrorMessage(`Vai trò "${vaiTro}" không hợp lệ.`);
       }, 750);
 
     } catch (error: any) {
       console.log('LOGIN CATCH ERROR:', error);
+=======
+        setLoading(false);
+
+        router.replace('/admin');
+
+        return;
+      }
+
+      // =========================
+      // CHỦ TRỌ
+      // =========================
+
+      if (vaiTro === 'ChuTro') {
+        setLoading(false);
+
+        router.replace('/chu-tro' as any);
+
+        return;
+      }
+
+      // =========================
+      // NGƯỜI THUÊ
+      // =========================
+
+      if (vaiTro === 'NguoiThue') {
+
+        setLoading(false);
+
+        router.replace('/(tabs)' as any);
+
+        return;
+      }
+
+      // =========================
+      // VAI TRÒ KHÔNG HỢP LỆ
+      // =========================
+
+>>>>>>> de48903ed550643542b229580638f9bfc52d4866
       await supabase.auth.signOut();
       setErrorMessage(error?.message || 'Có lỗi xảy ra trong quá trình đăng nhập. Vui lòng thử lại.');
       setLoading(false);

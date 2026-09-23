@@ -13,7 +13,11 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import { backendApi } from '@/services/backend';
+<<<<<<< HEAD
 import { styles } from '@/styles/home.styles';
+=======
+import { styles } from '@/styles/tabs/index.styles';
+>>>>>>> de48903ed550643542b229580638f9bfc52d4866
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -126,10 +130,88 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 13, color: '#999' }}>
                 {isLoggedIn ? `Xin chào 👋` : '🏠 Tìm Trọ'}
               </Text>
+<<<<<<< HEAD
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#222' }}>
                 {isLoggedIn ? (hoTen || 'Người dùng') : 'Tìm phòng trọ phù hợp'}
               </Text>
             </View>
+=======
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.bannerEmoji}>🏠</Text>
+        </View>
+
+        {/* ================= SECTION ================= */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            Phòng trọ nổi bật
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/search' as any)}
+          >
+            <Text style={styles.seeAll}>
+              Xem tất cả
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ================= ROOM LIST ================= */}
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color="#007AFF"
+            style={{ marginTop: 30 }}
+          />
+        ) : filteredRooms.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>🏠</Text>
+
+            <Text style={styles.emptyText}>
+              Không tìm thấy phòng trọ
+            </Text>
+          </View>
+        ) : (
+          filteredRooms.map((room) => (
+            <TouchableOpacity
+              key={room.ma_phong}
+              style={styles.roomCard}
+              onPress={() => {
+                router.push(`/room/${room.ma_phong}` as any);
+              }}
+            >
+              <Image
+                source={{ uri: room.anh_dai_dien || 'https://via.placeholder.com/300x200?text=No+Image' }}
+                style={styles.roomImage}
+              />
+
+              <View style={styles.roomInfo}>
+                <Text
+                  style={styles.roomName}
+                  numberOfLines={2}
+                >
+                  {room.tieu_de || `Phòng ${room.so_phong}`}
+                </Text>
+
+                <Text
+                  style={styles.roomAddress}
+                  numberOfLines={1}
+                >
+                  📍 {[room.khu_tro?.quan_huyen, room.khu_tro?.thanh_pho].filter(Boolean).join(', ') || 'Chưa rõ'}
+                </Text>
+
+                <View style={styles.roomBottom}>
+                  <Text style={styles.roomPrice}>
+                    {room.gia_thue?.toLocaleString('vi-VN')} đ/tháng
+                  </Text>
+
+                  <Text style={styles.roomArea}>
+                    {room.dien_tich ? `${room.dien_tich} m²` : '--'}
+                  </Text>
+                </View>
+              </View>
+>>>>>>> de48903ed550643542b229580638f9bfc52d4866
 
             {/* NÚT ĐĂNG NHẬP / HỒ SƠ */}
             {isLoggedIn ? (
@@ -427,3 +509,9 @@ export default function HomeScreen() {
     </View>
   );
 }
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> de48903ed550643542b229580638f9bfc52d4866
