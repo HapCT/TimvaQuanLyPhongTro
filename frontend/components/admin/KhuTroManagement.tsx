@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
 import { KhuTro } from '@/types';
 import { styles } from '@/styles/admin/rooms-management.styles';
@@ -99,16 +99,12 @@ export default function KhuTroManagement() {
     try {
       setDeletingId(id);
 
-      // Kiểm tra xem có phòng nào thuộc khu trọ này không
-      const { count, error: countError } = await supabase
-        .from('phong_tro')
-        .select('*', { count: 'exact', head: true })
-        .eq('ma_khu_tro', id);
-        
-      if (countError) throw countError;
-      
-      if (count && count > 0) {
-        showAlert('Không thể xóa', `Khu trọ này đang có ${count} phòng. Vui lòng xóa các phòng trước.`);
+      // Kiểm tra xem có phòng nào thuộc khu trọ này không qua backend
+      const roomsRes = await backendApi.get(`/api/phong-tro?ma_khu_tro=${id}`);
+      const roomCount = (roomsRes.data?.rooms || []).length;
+
+      if (roomCount > 0) {
+        showAlert('Không thể xóa', `Khu trọ này đang có ${roomCount} phòng. Vui lòng xóa các phòng trước.`);
         return;
       }
 
@@ -299,9 +295,7 @@ export default function KhuTroManagement() {
             <Text style={[styles.toggleBtnText, viewMode === 'table' && styles.toggleBtnTextActive]}>Bảng</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={formStyles.addRoomButton} onPress={openAddForm}>
-            <Text style={formStyles.addRoomButtonText}>+ Thêm khu trọ</Text>
-          </TouchableOpacity>
+          {/* Admin chỉ xem danh sách khu trọ do các chủ trọ sở hữu */}
         </View>
       </View>
 

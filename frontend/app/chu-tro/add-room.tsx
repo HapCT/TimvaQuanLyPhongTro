@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Head } from 'expo-router/head';
+import Head from 'expo-router/head';
 
 export default function AddRoomScreen() {
   return (

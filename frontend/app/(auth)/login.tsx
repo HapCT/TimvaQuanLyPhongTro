@@ -2,20 +2,22 @@
 import React, { useEffect, useState } from 'react';
 
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
-import { supabase } from '@/services/supabase';
+import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/auth/login.styles';
 import { router } from 'expo-router';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -29,48 +31,36 @@ export default function LoginScreen() {
   // KIỂM TRA PHIÊN ĐĂNG NHẬP
   // =========================
   useEffect(() => {
-    checkExistingSession();
-  }, []);
-
-  const checkExistingSession = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       if (user) {
-        const { data: nguoiDungArr } = await supabase
-          .from('nguoi_dung')
-          .select('vai_tro')
-          .eq('ma_nguoi_dung', user.id)
-          .maybeSingle();
-        const role = String((nguoiDungArr as any)?.vai_tro || '').trim();
-        if (role === 'Admin' || role === 'QuanTri') {
-          if (Platform.OS !== 'web') {
-            await supabase.auth.signOut();
-            Alert.alert('Thông báo', 'Tài khoản Admin chỉ được phép đăng nhập trên máy tính (Web).');
+        try {
+          const { data: nguoiDung } = await backendApi.get('/api/users/me');
+          const role = String(nguoiDung?.vai_tro || '').trim();
+          if (role === 'Admin' || role === 'QuanTri') {
+            if (Platform.OS !== 'web') {
+              await signOut(firebaseAuth);
+              Alert.alert('Thông báo', 'Tài khoản Admin chỉ được phép đăng nhập trên máy tính (Web).');
+              setCheckingSession(false);
+              return;
+            }
+            router.replace('/admin');
+            return;
+          } else if (role === 'ChuTro') {
+            router.replace('/(landlord)' as any);
+            return;
+          } else if (role === 'NguoiThue') {
+            router.replace('/(tabs)');
             return;
           }
-          router.replace('/admin');
-          return;
-        } else if (role === 'ChuTro') {
-          router.replace('/(landlord)' as any);
-          return;
-        } else if (role === 'NguoiThue') {
-<<<<<<< HEAD
-          router.replace('/(tabs)');
-=======
-          router.replace('/(tabs)' as any);
->>>>>>> de48903ed550643542b229580638f9bfc52d4866
-          return;
+        } catch (error) {
+          console.log('CHECK SESSION ERROR:', error);
         }
       }
-    } catch (error) {
-      console.log('CHECK SESSION ERROR:', error);
-    } finally {
       setCheckingSession(false);
-    }
-  };
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleLogin = async () => {
     setErrorMessage(null);
@@ -100,61 +90,13 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // =========================
-      // ĐĂNG NHẬP SUPABASE AUTH
-      // =========================
-      const {
-        data: authData,
-        error: authError,
-      } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: matKhau,
-      });
-
-      if (authError) {
-        let msg = 'Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!';
-        if (authError.message?.toLowerCase().includes('invalid login credentials')) {
-          msg = 'Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!';
-        } else if (authError.message?.toLowerCase().includes('email not confirmed')) {
-          msg = 'Email chưa được xác thực. Vui lòng kiểm tra hộp thư!';
-        } else if (authError.message) {
-          msg = authError.message;
-        }
-        setErrorMessage(msg);
-        setLoading(false);
-        return;
-      }
-
-      if (!authData.user) {
-        setErrorMessage('Không tìm thấy thông tin tài khoản đăng nhập.');
-        setLoading(false);
-        return;
-      }
-
-      // =========================
-      // LẤY THÔNG TIN NGƯỜI DÙNG
-      // =========================
-      const {
-        data: nguoiDung,
-        error: roleError,
-      } = await supabase
-        .from('nguoi_dung')
-        .select('ma_nguoi_dung, ho_ten, vai_tro')
-        .eq('ma_nguoi_dung', authData.user.id)
-        .maybeSingle();
-
-      if (roleError || !nguoiDung) {
-        console.log('LỖI LẤY NGƯỜI DÙNG:', roleError);
-        await supabase.auth.signOut();
-        setErrorMessage('Không tìm thấy thông tin hồ sơ người dùng trong hệ thống.');
-        setLoading(false);
-        return;
-      }
+      await signInWithEmailAndPassword(firebaseAuth, email.trim(), matKhau);
+      const { data: nguoiDung } = await backendApi.get('/api/users/me');
 
       const vaiTro = String(nguoiDung.vai_tro || '').trim();
 
       if (!vaiTro) {
-        await supabase.auth.signOut();
+        await signOut(firebaseAuth);
         setErrorMessage('Tài khoản chưa được thiết lập vai trò.');
         setLoading(false);
         return;
@@ -176,7 +118,7 @@ export default function LoginScreen() {
 
         if (vaiTro === 'Admin' || vaiTro === 'QuanTri') {
           if (Platform.OS !== 'web') {
-            supabase.auth.signOut();
+            signOut(firebaseAuth);
             setErrorMessage('Tài khoản Admin chỉ được phép đăng nhập trên máy tính (Web).');
             setSuccessMessage(null);
             return;
@@ -195,52 +137,15 @@ export default function LoginScreen() {
           return;
         }
 
-<<<<<<< HEAD
         setErrorMessage(`Vai trò "${vaiTro}" không hợp lệ.`);
       }, 750);
 
     } catch (error: any) {
       console.log('LOGIN CATCH ERROR:', error);
-=======
-        setLoading(false);
-
-        router.replace('/admin');
-
-        return;
-      }
-
-      // =========================
-      // CHỦ TRỌ
-      // =========================
-
-      if (vaiTro === 'ChuTro') {
-        setLoading(false);
-
-        router.replace('/chu-tro' as any);
-
-        return;
-      }
-
-      // =========================
-      // NGƯỜI THUÊ
-      // =========================
-
-      if (vaiTro === 'NguoiThue') {
-
-        setLoading(false);
-
-        router.replace('/(tabs)' as any);
-
-        return;
-      }
-
-      // =========================
-      // VAI TRÒ KHÔNG HỢP LỆ
-      // =========================
-
->>>>>>> de48903ed550643542b229580638f9bfc52d4866
-      await supabase.auth.signOut();
-      setErrorMessage(error?.message || 'Có lỗi xảy ra trong quá trình đăng nhập. Vui lòng thử lại.');
+      await signOut(firebaseAuth).catch(() => undefined);
+      setErrorMessage(error?.code === 'auth/invalid-credential'
+        ? 'Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!'
+        : error?.response?.data?.error || error?.message || 'Có lỗi xảy ra trong quá trình đăng nhập. Vui lòng thử lại.');
       setLoading(false);
     }
   };

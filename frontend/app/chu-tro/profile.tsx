@@ -1,14 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
+import { signOut } from 'firebase/auth';
 import { useRouter } from 'expo-router';
-import { Head } from 'expo-router/head';
+import Head from 'expo-router/head';
 
 export default function ProfileScreen() {
   const router = useRouter();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut(firebaseAuth);
     router.replace('/login');
   };
 

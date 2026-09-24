@@ -13,8 +13,9 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function LandlordKhuTroScreen() {
   const { width } = useWindowDimensions();
@@ -36,21 +37,30 @@ export default function LandlordKhuTroScreen() {
   const [quanHuyen, setQuanHuyen] = useState('');
   const [thanhPho, setThanhPho] = useState('Hà Nội');
   const [moTa, setMoTa] = useState('');
+  const [trangThai, setTrangThai] = useState('HoatDong');
 
   useEffect(() => {
-    loadLandlordKhuTro();
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      if (user) {
+        loadLandlordKhuTro(user);
+      } else {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
-  const loadLandlordKhuTro = async () => {
+  const loadLandlordKhuTro = async (user = firebaseAuth.currentUser) => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      setLandlordId(user.id);
+      setLandlordId(user.uid);
 
       const res = await backendApi.get('/api/khu-tro');
       const allKhu = res.data || [];
-      const landlordKhu = allKhu.filter((k: any) => k.ma_chu_tro === user.id);
+      const landlordKhu = allKhu.filter(
+        (k: any) => String(k.ma_chu_tro || '').trim() === String(user.uid).trim()
+      );
       setMyKhuTroList(landlordKhu);
     } catch (e) {
       console.log('LOAD KHU TRO ERROR:', e);
@@ -67,6 +77,7 @@ export default function LandlordKhuTroScreen() {
       setQuanHuyen(khu.quan_huyen || '');
       setThanhPho(khu.thanh_pho || 'Hà Nội');
       setMoTa(khu.mo_ta || '');
+      setTrangThai(khu.trang_thai || 'HoatDong');
     } else {
       setEditingKhu(null);
       setTenKhuTro('');
@@ -74,6 +85,7 @@ export default function LandlordKhuTroScreen() {
       setQuanHuyen('');
       setThanhPho('Hà Nội');
       setMoTa('');
+      setTrangThai('HoatDong');
     }
     setFormVisible(true);
   };
@@ -93,6 +105,7 @@ export default function LandlordKhuTroScreen() {
         quan_huyen: quanHuyen.trim() || null,
         thanh_pho: thanhPho.trim() || 'Hà Nội',
         mo_ta: moTa.trim() || null,
+        trang_thai: trangThai,
         ma_chu_tro: landlordId,
       };
 
@@ -260,6 +273,43 @@ export default function LandlordKhuTroScreen() {
                     onChangeText={setThanhPho}
                   />
                 </View>
+              </View>
+
+              <Text style={[styles.label, { marginTop: 10 }]}>Trạng thái khu trọ</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    borderColor: trangThai === 'HoatDong' ? '#34C759' : '#CBD5E1',
+                    backgroundColor: trangThai === 'HoatDong' ? '#F0FDF4' : '#F8FAFC',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setTrangThai('HoatDong')}
+                >
+                  <Text style={{ fontWeight: 'bold', color: trangThai === 'HoatDong' ? '#15803D' : '#64748B' }}>
+                    🟢 Hoạt động
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    borderColor: trangThai === 'TamDung' ? '#F59E0B' : '#CBD5E1',
+                    backgroundColor: trangThai === 'TamDung' ? '#FEF3C7' : '#F8FAFC',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setTrangThai('TamDung')}
+                >
+                  <Text style={{ fontWeight: 'bold', color: trangThai === 'TamDung' ? '#B45309' : '#64748B' }}>
+                    🟡 Tạm dừng
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <Text style={[styles.label, { marginTop: 10 }]}>Mô tả bổ sung</Text>

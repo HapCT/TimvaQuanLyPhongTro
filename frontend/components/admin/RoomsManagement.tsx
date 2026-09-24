@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
 import { RoomWithDetails, RoomStatus, KhuTro, AnhPhong, TienIch, PhongTienIch, PhongTro } from '@/types';
 import { styles } from '@/styles/admin/rooms-management.styles';
@@ -133,22 +133,16 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
 
     try {
       setUpdatingId(room.ma_phong);
-      const { error } = await supabase
-        .from('phong_tro')
-        .update({ trang_thai: statusKey, ngay_cap_nhat: new Date().toISOString() })
-        .eq('ma_phong', room.ma_phong);
-
-      if (error) {
-        showAlert('Lỗi', 'Không thể đổi trạng thái: ' + error.message);
-        return;
-      }
+      await backendApi.patch(`/api/phong-tro/${room.ma_phong}/trang-thai`, {
+        trang_thai: statusKey,
+      });
 
       setRooms((prev) =>
         prev.map((r) => (r.ma_phong === room.ma_phong ? { ...r, trang_thai: statusKey } : r))
       );
-    } catch (e) {
+    } catch (e: any) {
       console.log('CHANGE STATUS ERROR:', e);
-      showAlert('Lỗi', 'Có lỗi xảy ra khi đổi trạng thái.');
+      showAlert('Lỗi', 'Có lỗi xảy ra khi đổi trạng thái: ' + (e.response?.data?.error || e.message));
     } finally {
       setUpdatingId(null);
     }
@@ -373,10 +367,6 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
             onPress={() => setViewMode('table')}
           >
             <Text style={[styles.toggleBtnText, viewMode === 'table' && styles.toggleBtnTextActive]}>Bảng</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={formStyles.addRoomButton} onPress={openAddForm}>
-            <Text style={formStyles.addRoomButtonText}>+ Thêm phòng</Text>
           </TouchableOpacity>
         </View>
       </View>

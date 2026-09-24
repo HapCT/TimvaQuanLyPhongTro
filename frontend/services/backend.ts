@@ -1,8 +1,8 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { firebaseAuth } from './firebase';
 
-<<<<<<< HEAD
 /**
  * Cấu hình BACKEND_URL tự động theo môi trường:
  * - Web (localhost)   : http://localhost:3000
@@ -35,10 +35,6 @@ function getBackendUrl(): string {
 }
 
 export const BACKEND_URL = getBackendUrl();
-=======
-// URL của máy chủ Backend (thay thế nếu dùng IP thật trên điện thoại)
-export const BACKEND_URL = 'http://10.91.130.131:3000';
->>>>>>> de48903ed550643542b229580638f9bfc52d4866
 
 export const backendApi = axios.create({
   baseURL: BACKEND_URL,
@@ -46,6 +42,15 @@ export const backendApi = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+backendApi.interceptors.request.use(async (config) => {
+  const user = firebaseAuth.currentUser;
+  if (user) {
+    const token = await user.getIdToken();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // Log để debug khi cần

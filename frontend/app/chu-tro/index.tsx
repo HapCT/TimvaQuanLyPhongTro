@@ -8,10 +8,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { backendApi } from '@/services/backend';
 import { useRouter } from 'expo-router';
-import { Head } from 'expo-router/head';
+import Head from 'expo-router/head';
 
 export default function ChuTroDashboard() {
   const router = useRouter();
@@ -21,32 +22,31 @@ export default function ChuTroDashboard() {
   const [stats, setStats] = useState({ total: 0, rented: 0, available: 0 });
 
   useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       if (!user) {
-        router.replace('/login');
+        setLoading(false);
+        router.replace('/(tabs)');
         return;
       }
+      loadData(user);
+    });
 
-      const { data: userData } = await supabase
-        .from('nguoi_dung')
-        .select('ho_ten, ma_nguoi_dung')
-        .eq('ma_nguoi_dung', user.id)
-        .single();
+    return () => unsubscribe();
+  }, []);
+
+  const loadData = async (user: any) => {
+    try {
+      const { data: userData } = await backendApi.get('/api/users/me');
 
       if (userData) {
-        setHoTen(userData.ho_ten);
+        setHoTen(userData.ho_ten || '');
       }
 
       const response = await backendApi.get('/api/phong-tro');
       if (response.data && response.data.rooms) {
         // Lọc các phòng thuộc về chủ trọ này
         const filtered = response.data.rooms.filter(
-          (r: any) => String(r.khu_tro?.ma_chu_tro) === String(user.id)
+          (r: any) => String(r.khu_tro?.ma_chu_tro) === String(user.uid)
         );
         setMyRooms(filtered);
         

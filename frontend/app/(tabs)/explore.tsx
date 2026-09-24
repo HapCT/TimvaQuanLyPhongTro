@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { backendApi } from '@/services/backend';
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
 
 const PRICE_FILTERS = [
   { label: 'Tất cả mức giá', min: 0, max: Infinity },
@@ -54,7 +54,7 @@ export default function ExploreScreen() {
 
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = firebaseAuth.currentUser;
       setIsLoggedIn(!!user);
     } catch (e) {
       setIsLoggedIn(false);
@@ -99,6 +99,8 @@ export default function ExploreScreen() {
     const keyword = search.trim().toLowerCase();
 
     let list = rooms.filter((room) => {
+      // Ẩn phòng đã cho thuê khỏi danh sách người thuê (trừ khi chủ động lọc DaThue)
+      if (selectedStatus === 'ALL' && room.trang_thai === 'DaThue') return false;
       // Lọc từ khóa
       const matchKeyword =
         !keyword ||

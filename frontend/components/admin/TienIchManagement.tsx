@@ -204,11 +204,8 @@ export default function TienIchManagement() {
 
       <View style={styles.resultInfo}>
         <Text style={styles.resultText}>
-          Tìm thấy <Text style={styles.resultNumber}>{tienIchs.length}</Text> tiện ích
+          Tổng số: <Text style={styles.resultNumber}>{tienIchs.length}</Text> tiện ích trong hệ thống
         </Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={openAddModal}>
-          <Text style={styles.refreshText}>+ Thêm mới</Text>
-        </TouchableOpacity>
       </View>
 
       {loading ? (

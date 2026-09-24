@@ -3,28 +3,31 @@ import React, {
   useState,
 } from 'react';
 
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  useWindowDimensions,
-} from 'react-native';
-import UsersManagement from '@/components/admin/UsersManagement';
-import RoomsManagement from '@/components/admin/RoomsManagement';
 import KhuTroManagement from '@/components/admin/KhuTroManagement';
+import RoomReviewManagement from '@/components/admin/RoomReviewManagement';
+import RoomsManagement from '@/components/admin/RoomsManagement';
 import TienIchManagement from '@/components/admin/TienIchManagement';
-import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
+import UsersManagement from '@/components/admin/UsersManagement';
+import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/admin/admin.styles';
 import { showAlert } from '@/utils/alert';
+import { router } from 'expo-router';
+import { signOut } from 'firebase/auth';
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 export default function AdminScreen() {
   const [hoTen, setHoTen] = useState('');
   const [loading, setLoading] = useState(true);
-  // Mặc định mở ngay tab 'users' để hiển thị toàn bộ danh sách tài khoản
-  const [menu, setMenu] = useState<'users' | 'dashboard' | 'khutro' | 'rooms' | 'tienich' | 'bookings' | 'contracts' | 'reviews' | 'requests'>('users');
+  // Mặc định mở tab 'review_posts' để xem và duyệt bài đăng phòng trọ mới nhất
+  const [menu, setMenu] = useState<'review_posts' | 'users' | 'dashboard' | 'khutro' | 'rooms' | 'tienich' | 'bookings' | 'contracts' | 'reviews' | 'requests'>('review_posts');
   const [userStats, setUserStats] = useState({
     total: 0,
     owners: 0,
@@ -50,14 +53,9 @@ export default function AdminScreen() {
       setLoading(true);
 
       // LẤY USER AUTH HIỆN TẠI
-      const {
-        data: authData,
-        error: authError,
-      } = await supabase.auth.getUser();
+      const user = firebaseAuth.currentUser;
 
-      const user = authData?.user;
-
-      if (authError || !user) {
+      if (!user) {
         showAlert(
           'Chưa đăng nhập',
           'Vui lòng đăng nhập bằng tài khoản quản trị.'
@@ -67,16 +65,9 @@ export default function AdminScreen() {
       }
 
       // LẤY THÔNG TIN NGƯỜI DÙNG
-      const {
-        data,
-        error,
-      } = await supabase
-        .from('nguoi_dung')
-        .select('ma_nguoi_dung, ho_ten, vai_tro')
-        .eq('ma_nguoi_dung', user.id)
-        .maybeSingle();
+      const { data } = await backendApi.get('/api/users/me');
 
-      if (error || !data) {
+      if (!data) {
         showAlert(
           'Lỗi tài khoản',
           'Không tìm thấy thông tin tài khoản trong hệ thống.'
@@ -92,7 +83,7 @@ export default function AdminScreen() {
           'Không có quyền',
           `Tài khoản hiện tại có vai trò "${vaiTro}", không phải Quản trị viên.`
         );
-        router.replace('/home');
+        router.replace('/(tabs)');
         return;
       }
 
@@ -112,7 +103,7 @@ export default function AdminScreen() {
   const handleLogout = async () => {
     try {
       setLoading(true);
-      await supabase.auth.signOut();
+      await signOut(firebaseAuth);
       router.replace('/login');
     } catch (error) {
       console.log('LOGOUT ERROR:', error);
@@ -152,7 +143,7 @@ export default function AdminScreen() {
           <View style={styles.mobileHeaderRight}>
             <TouchableOpacity
               style={styles.backHomeButton}
-              onPress={() => router.push('/home')}
+              onPress={() => router.push('/(tabs)')}
             >
               <Text style={styles.backHomeButtonText}>Trang chủ</Text>
             </TouchableOpacity>
@@ -172,6 +163,18 @@ export default function AdminScreen() {
           showsHorizontalScrollIndicator={false}
           style={styles.mobileNavScroll}
         >
+          <TouchableOpacity
+            style={[
+              styles.mobileNavChip,
+              menu === 'review_posts' && styles.mobileNavChipActive,
+            ]}
+            onPress={() => setMenu('review_posts')}
+          >
+            <Text style={[styles.mobileNavChipText, menu === 'review_posts' && styles.mobileNavChipTextActive]}>
+              📝 Duyệt bài đăng
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.mobileNavChip,
@@ -287,7 +290,14 @@ export default function AdminScreen() {
           contentContainerStyle={styles.mobileContentContainer}
           showsVerticalScrollIndicator={false}
         >
-          {/* USERS (MẶC ĐỊNH) */}
+          {/* DUYỆT BÀI ĐĂNG (MẶC ĐỊNH) */}
+          {menu === 'review_posts' && (
+            <View style={styles.sectionCard}>
+              <RoomReviewManagement />
+            </View>
+          )}
+
+          {/* USERS */}
           {menu === 'users' && (
             <View style={styles.sectionCard}>
               <UsersManagement onStatsUpdate={setUserStats} />
@@ -351,14 +361,6 @@ export default function AdminScreen() {
             </View>
           )}
 
-          {/* BOOKINGS */}
-          {menu === 'bookings' && (
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Yêu cầu đặt phòng</Text>
-              <Text style={styles.sectionSub}>Quản lý các yêu cầu đặt phòng từ người thuê.</Text>
-            </View>
-          )}
-
           {/* CONTRACTS */}
           {menu === 'contracts' && (
             <View style={styles.sectionCard}>
@@ -396,6 +398,24 @@ export default function AdminScreen() {
       <View style={styles.sidebar}>
         <Text style={styles.logo}>QUẢN TRỊ</Text>
         <Text style={styles.logoSub}>Tìm & Quản lý Phòng Trọ</Text>
+
+        {/* DUYỆT BÀI ĐĂNG (MẶC ĐỊNH) */}
+        <TouchableOpacity
+          style={[
+            styles.menuItem,
+            menu === 'review_posts' && styles.menuItemActive,
+          ]}
+          onPress={() => setMenu('review_posts')}
+        >
+          <Text
+            style={[
+              styles.menuText,
+              menu === 'review_posts' && styles.menuTextActive,
+            ]}
+          >
+            📝 Duyệt bài đăng
+          </Text>
+        </TouchableOpacity>
 
         {/* TÀI KHOẢN (NGƯỜI DÙNG) */}
         <TouchableOpacity
@@ -487,23 +507,7 @@ export default function AdminScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* ĐẶT PHÒNG */}
-        <TouchableOpacity
-          style={[
-            styles.menuItem,
-            menu === 'bookings' && styles.menuItemActive,
-          ]}
-          onPress={() => setMenu('bookings')}
-        >
-          <Text
-            style={[
-              styles.menuText,
-              menu === 'bookings' && styles.menuTextActive,
-            ]}
-          >
-            Yêu cầu đặt phòng
-          </Text>
-        </TouchableOpacity>
+
 
         {/* HỢP ĐỒNG & THANH TOÁN */}
         <TouchableOpacity
@@ -561,13 +565,6 @@ export default function AdminScreen() {
 
         {/* SIDEBAR BOTTOM */}
         <View style={styles.sidebarBottom}>
-          {/* NÚT VỀ TRANG CHỦ */}
-          <TouchableOpacity
-            style={[styles.menuItem, { marginBottom: 12, backgroundColor: '#F3F4F6' }]}
-            onPress={() => router.push('/home')}
-          >
-            <Text style={styles.menuText}>Về trang chủ</Text>
-          </TouchableOpacity>
 
 
           <View style={styles.adminInfo}>
@@ -606,6 +603,7 @@ export default function AdminScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.headerTitle}>
+              {menu === 'review_posts' && 'Duyệt bài đăng phòng trọ'}
               {menu === 'users' && 'Quản lý tài khoản người dùng'}
               {menu === 'dashboard' && 'Tổng quan hệ thống'}
               {menu === 'khutro' && 'Quản lý khu trọ'}
@@ -623,7 +621,14 @@ export default function AdminScreen() {
           </View>
         </View>
 
-        {/* USERS (MẶC ĐỊNH) */}
+        {/* DUYỆT BÀI ĐĂNG (MẶC ĐỊNH) */}
+        {menu === 'review_posts' && (
+          <View style={styles.sectionCard}>
+            <RoomReviewManagement />
+          </View>
+        )}
+
+        {/* USERS */}
         {menu === 'users' && (
           <View style={styles.sectionCard}>
             <UsersManagement onStatsUpdate={setUserStats} />

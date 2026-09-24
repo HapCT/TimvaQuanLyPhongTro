@@ -9,6 +9,7 @@ export type User = {
   ngay_tao?: string | null;
   ngay_cap_nhat?: string | null;
   email?: string | null;
+  is_locked?: boolean | null;
 };
 
 export type RoleFilter = 'ALL' | 'NguoiThue' | 'ChuTro' | 'Admin';

@@ -1,13 +1,15 @@
+import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
+import { styles } from '@/styles/header.styles';
+import { router } from 'expo-router';
+import { signOut } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
   Text,
   TouchableOpacity,
+  View,
   useWindowDimensions,
 } from 'react-native';
-import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
-import { styles } from '@/styles/header.styles';
 
 export default function Header() {
   const { width } = useWindowDimensions();
@@ -24,25 +26,13 @@ export default function Header() {
 
   const getUser = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const user = firebaseAuth.currentUser;
       if (!user) return;
 
-      const { data, error } = await supabase
-        .from('nguoi_dung')
-        .select('ho_ten, vai_tro')
-        .eq('ma_nguoi_dung', user.id)
-        .single();
-
-      if (error) {
-        console.log('HEADER USER ERROR:', error);
-        return;
-      }
+      const { data } = await backendApi.get('/api/users/me');
 
       if (data) {
-        setHoTen(data.ho_ten);
+        setHoTen(data.ho_ten || '');
         setVaiTro(String(data.vai_tro || '').trim());
       }
     } catch (error) {
@@ -57,11 +47,10 @@ export default function Header() {
 
   const logout = async () => {
     setMenuOpen(false);
-
-    await supabase.auth.signOut();
-
+    await signOut(firebaseAuth);
     router.replace('/login');
   };
+
 
   return (
     <View style={styles.wrapper}>

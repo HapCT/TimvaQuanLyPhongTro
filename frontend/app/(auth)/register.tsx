@@ -2,18 +2,20 @@
 import React, { useState } from 'react';
 
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
-import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
+import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/auth/register.styles';
+import { router } from 'expo-router';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 export default function RegisterScreen() {
   const [hoTen, setHoTen] = useState('');
@@ -160,164 +162,13 @@ export default function RegisterScreen() {
       console.log('VAI TRÒ:', vaiTro);
       console.log('========================');
 
-      // =========================
-      // 1. TẠO TÀI KHOẢN AUTH
-      // =========================
-
-      const {
-        data: authData,
-        error: authError,
-      } = await supabase.auth.signUp({
+      const authData = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), matKhau);
+      await backendApi.post('/api/users/sync-profile', {
+        ho_ten: hoTen.trim(),
+        so_dien_thoai: soDienThoai.trim(),
         email: email.trim(),
-        password: matKhau,
+        vai_tro: vaiTro,
       });
-
-      console.log('AUTH DATA:', authData);
-      console.log('AUTH ERROR:', authError);
-
-      // =========================
-      // XỬ LÝ LỖI AUTH
-      // =========================
-
-      if (authError) {
-        const message =
-          authError.message.toLowerCase();
-
-        if (
-          message.includes('already registered') ||
-          message.includes('already exists')
-        ) {
-          Alert.alert(
-            'Email đã được đăng ký',
-            'Email này đã tồn tại trong hệ thống.\n\nVui lòng sử dụng email khác hoặc quay lại trang đăng nhập.'
-          );
-        } else if (
-          message.includes('invalid email')
-        ) {
-          Alert.alert(
-            'Email không hợp lệ',
-            'Email bạn nhập không đúng định dạng.'
-          );
-        } else if (
-          message.includes('password')
-        ) {
-          Alert.alert(
-            'Mật khẩu không hợp lệ',
-            authError.message
-          );
-        } else {
-          Alert.alert(
-            'Đăng ký thất bại',
-            authError.message
-          );
-        }
-
-        return;
-      }
-
-      if (!authData.user) {
-        Alert.alert(
-          'Đăng ký thất bại',
-          'Không tạo được tài khoản. Vui lòng thử lại.'
-        );
-        return;
-      }
-
-      const userId = authData.user.id;
-
-      console.log(
-        'AUTH USER ID:',
-        userId
-      );
-
-      // =========================
-      // 2. KIỂM TRA SESSION
-      // =========================
-
-      const {
-        data: sessionData,
-      } = await supabase.auth.getSession();
-
-      console.log(
-        'SESSION:',
-        sessionData.session
-      );
-
-      /*
-       * Nếu Supabase đang bật xác nhận email
-       * thì session có thể bằng null.
-       */
-
-      if (!sessionData.session) {
-        Alert.alert(
-          'Đăng ký thành công',
-          'Tài khoản đã được tạo.\n\nVui lòng kiểm tra email để xác nhận tài khoản trước khi đăng nhập.',
-          [
-            {
-              text: 'Đến trang đăng nhập',
-              onPress: () => {
-                router.replace('/login');
-              },
-            },
-          ]
-        );
-
-        return;
-      }
-
-      // =========================
-      // 3. LƯU THÔNG TIN NGƯỜI DÙNG
-      // =========================
-
-      const {
-        error: userError,
-      } = await supabase
-        .from('nguoi_dung')
-        .insert({
-          ma_nguoi_dung: userId,
-          ho_ten: hoTen.trim(),
-          so_dien_thoai: soDienThoai.trim(),
-          vai_tro: vaiTro,
-        });
-
-      console.log(
-        'USER ERROR:',
-        userError
-      );
-
-      // =========================
-      // XỬ LÝ LỖI INSERT
-      // =========================
-
-      if (userError) {
-        console.log(
-          'KHÔNG LƯU ĐƯỢC NGƯỜI DÙNG:',
-          userError
-        );
-
-        if (
-          userError.code === '23505'
-        ) {
-          Alert.alert(
-            'Tài khoản đã tồn tại',
-            'Thông tin người dùng này đã tồn tại trong hệ thống.'
-          );
-        } else if (
-          userError.code === '42501'
-        ) {
-          Alert.alert(
-            'Không có quyền thực hiện',
-            'Tài khoản đã được tạo nhưng hệ thống không cho phép lưu thông tin người dùng.\n\nVui lòng kiểm tra RLS trong Supabase.'
-          );
-        } else {
-          Alert.alert(
-            'Không lưu được thông tin',
-            userError.message
-          );
-        }
-
-        return;
-      }
 
       // =========================
       // 4. ĐĂNG KÝ THÀNH CÔNG
@@ -328,10 +179,10 @@ export default function RegisterScreen() {
       );
 
       // Đăng xuất tài khoản vừa tạo
-      await supabase.auth.signOut();
+      await signOut(firebaseAuth);
 
       Alert.alert(
-        'Đăng ký thành công 🎉',
+        'Đăng ký thành công',
         'Tài khoản của bạn đã được tạo thành công.\n\nBạn sẽ được chuyển đến trang đăng nhập.',
         [
           {
@@ -349,10 +200,30 @@ export default function RegisterScreen() {
         error
       );
 
-      Alert.alert(
-        'Có lỗi xảy ra',
-        'Không thể hoàn tất đăng ký. Vui lòng kiểm tra kết nối mạng và thử lại.'
-      );
+      const err = error as any;
+      let errorTitle = 'Có lỗi xảy ra';
+      let errorMsg = 'Không thể hoàn tất đăng ký. Vui lòng kiểm tra kết nối mạng và thử lại.';
+
+      if (err?.code === 'auth/email-already-in-use') {
+        errorTitle = 'Email đã được đăng ký';
+        errorMsg = 'Địa chỉ email này đã có tài khoản. Vui lòng dùng email khác hoặc đăng nhập.';
+      } else if (err?.code === 'auth/weak-password') {
+        errorTitle = 'Mật khẩu quá yếu';
+        errorMsg = 'Mật khẩu phải có ít nhất 6 ký tự và không quá đơn giản.';
+      } else if (err?.code === 'auth/invalid-email') {
+        errorTitle = 'Email không hợp lệ';
+        errorMsg = 'Địa chỉ email không đúng định dạng. Ví dụ: example@gmail.com';
+      } else if (err?.code === 'auth/network-request-failed') {
+        errorTitle = 'Lỗi kết nối mạng';
+        errorMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet và thử lại.';
+      } else if (err?.code === 'auth/too-many-requests') {
+        errorTitle = 'Quá nhiều yêu cầu';
+        errorMsg = 'Bạn đã thực hiện quá nhiều lần. Vui lòng thử lại sau vài phút.';
+      } else if (err?.response?.data?.error) {
+        errorTitle = 'Lỗi từ máy chủ';
+        errorMsg = err.response.data.error;
+      }
+      Alert.alert(errorTitle, errorMsg);
 
     } finally {
       setLoading(false);

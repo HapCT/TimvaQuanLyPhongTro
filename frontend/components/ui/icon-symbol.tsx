@@ -19,16 +19,11 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'magnifyingglass': 'search',
-<<<<<<< HEAD
   'person.fill': 'person',
   'heart.fill': 'favorite',
   'bell.fill': 'notifications',
-=======
-  'heart.fill': 'favorite',
-  'person.fill': 'person',
   'plus.circle.fill': 'add-circle',
   'list.bullet': 'list',
->>>>>>> de48903ed550643542b229580638f9bfc52d4866
 } as IconMapping;
 
 /**

@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
 import { KhuTro, TienIch, RoomStatus, AnhPhong, RoomWithDetails } from '@/types';
 import { styles } from '@/styles/admin/room-form.styles';

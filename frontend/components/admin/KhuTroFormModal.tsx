@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
 import { KhuTro } from '@/types';
 import { styles } from '@/styles/admin/room-form.styles';
@@ -118,8 +118,8 @@ export default function KhuTroFormModal({
     setLoading(true);
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id;
+      const user = firebaseAuth.currentUser;
+      const userId = user?.uid;
 
       if (!userId) {
         showAlert('Lỗi', 'Không lấy được thông tin tài khoản.');

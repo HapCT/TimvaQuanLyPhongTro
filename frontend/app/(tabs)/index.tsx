@@ -11,13 +11,10 @@ import {
   Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
-<<<<<<< HEAD
+import { onAuthStateChanged } from 'firebase/auth';
 import { styles } from '@/styles/home.styles';
-=======
-import { styles } from '@/styles/tabs/index.styles';
->>>>>>> de48903ed550643542b229580638f9bfc52d4866
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -32,10 +29,21 @@ export default function HomeScreen() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState<any[]>([]);
+  const [networkError, setNetworkError] = useState(false);
 
   useEffect(() => {
-    checkUser();   // Kiểm tra đăng nhập nhẹ (không chặn trang)
-    loadRooms();   // Luôn tải phòng, không cần đăng nhập
+    loadRooms(); // Luôn tải phòng, không cần đăng nhập
+
+    // Dùng onAuthStateChanged để detect session kể cả khi app vừa mở
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+      if (user) {
+        checkUser();
+      } else {
+        setIsLoggedIn(false);
+        setHoTen(null);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // =============================================
@@ -43,20 +51,16 @@ export default function HomeScreen() {
   // =============================================
   const checkUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = firebaseAuth.currentUser;
       if (!user) {
         setIsLoggedIn(false);
         return;
       }
 
-      const { data } = await supabase
-        .from('nguoi_dung')
-        .select('ho_ten, vai_tro')
-        .eq('ma_nguoi_dung', user.id)
-        .maybeSingle();
+      const { data } = await backendApi.get('/api/users/me');
 
       if (data) {
-        setHoTen(data.ho_ten);
+        setHoTen(data.ho_ten || null);
         setIsLoggedIn(true);
         const role = String(data.vai_tro || '').trim();
 
@@ -83,21 +87,28 @@ export default function HomeScreen() {
   // =============================================
   const loadRooms = async () => {
     try {
+      setNetworkError(false);
       const response = await backendApi.get('/api/phong-tro');
       if (response.data?.rooms) {
         setRooms(response.data.rooms);
       }
-    } catch (error) {
-      console.log('LOAD ROOMS ERROR:', error);
+    } catch (error: any) {
+      console.log('LOAD ROOMS ERROR:', error?.message || error);
+      // Nếu lỗi kết nối mạng (network error)
+      if (error?.code === 'ERR_NETWORK' || error?.message?.includes('Network')) {
+        setNetworkError(true);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   // =============================================
-  // TÌM KIẾM
+  // TÌM KIẾM (chỉ hiển thị phòng ConTrong – ẩn DaThue)
   // =============================================
   const filteredRooms = rooms.filter((room) => {
+    // Ẩn phòng đã cho thuê khỏi trang người thuê
+    if (room.trang_thai === 'DaThue') return false;
     const keyword = search.trim().toLowerCase();
     if (!keyword) return true;
     return (
@@ -130,88 +141,10 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 13, color: '#999' }}>
                 {isLoggedIn ? `Xin chào 👋` : '🏠 Tìm Trọ'}
               </Text>
-<<<<<<< HEAD
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#222' }}>
                 {isLoggedIn ? (hoTen || 'Người dùng') : 'Tìm phòng trọ phù hợp'}
               </Text>
             </View>
-=======
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.bannerEmoji}>🏠</Text>
-        </View>
-
-        {/* ================= SECTION ================= */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            Phòng trọ nổi bật
-          </Text>
-
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)/search' as any)}
-          >
-            <Text style={styles.seeAll}>
-              Xem tất cả
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ================= ROOM LIST ================= */}
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#007AFF"
-            style={{ marginTop: 30 }}
-          />
-        ) : filteredRooms.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🏠</Text>
-
-            <Text style={styles.emptyText}>
-              Không tìm thấy phòng trọ
-            </Text>
-          </View>
-        ) : (
-          filteredRooms.map((room) => (
-            <TouchableOpacity
-              key={room.ma_phong}
-              style={styles.roomCard}
-              onPress={() => {
-                router.push(`/room/${room.ma_phong}` as any);
-              }}
-            >
-              <Image
-                source={{ uri: room.anh_dai_dien || 'https://via.placeholder.com/300x200?text=No+Image' }}
-                style={styles.roomImage}
-              />
-
-              <View style={styles.roomInfo}>
-                <Text
-                  style={styles.roomName}
-                  numberOfLines={2}
-                >
-                  {room.tieu_de || `Phòng ${room.so_phong}`}
-                </Text>
-
-                <Text
-                  style={styles.roomAddress}
-                  numberOfLines={1}
-                >
-                  📍 {[room.khu_tro?.quan_huyen, room.khu_tro?.thanh_pho].filter(Boolean).join(', ') || 'Chưa rõ'}
-                </Text>
-
-                <View style={styles.roomBottom}>
-                  <Text style={styles.roomPrice}>
-                    {room.gia_thue?.toLocaleString('vi-VN')} đ/tháng
-                  </Text>
-
-                  <Text style={styles.roomArea}>
-                    {room.dien_tich ? `${room.dien_tich} m²` : '--'}
-                  </Text>
-                </View>
-              </View>
->>>>>>> de48903ed550643542b229580638f9bfc52d4866
 
             {/* NÚT ĐĂNG NHẬP / HỒ SƠ */}
             {isLoggedIn ? (
@@ -332,10 +265,24 @@ export default function HomeScreen() {
 
           {loading ? (
             <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 30 }} />
+          ) : networkError ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40, gap: 12 }}>
+              <Text style={{ fontSize: 40 }}>📡</Text>
+              <Text style={{ color: '#FF3B30', fontWeight: 'bold', fontSize: 15 }}>Không thể kết nối đến server</Text>
+              <Text style={{ color: '#999', textAlign: 'center', fontSize: 13 }}>
+                Hãy đảm bảo điện thoại và máy tính cùng mạng WiFi,{`\n`}rồi thử lại.
+              </Text>
+              <TouchableOpacity
+                style={{ backgroundColor: '#007AFF', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10 }}
+                onPress={loadRooms}
+              >
+                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>🔄 Thử lại</Text>
+              </TouchableOpacity>
+            </View>
           ) : filteredRooms.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <Text style={{ fontSize: 40 }}>🏠</Text>
-              <Text style={{ color: '#999', marginTop: 10 }}>Không tìm thấy phòng trọ</Text>
+              <Text style={{ color: '#999', marginTop: 10 }}>Chưa có phòng trọ nào được duyệt</Text>
             </View>
           ) : (
             <View style={styles.roomGrid}>
@@ -509,9 +456,4 @@ export default function HomeScreen() {
     </View>
   );
 }
-<<<<<<< HEAD
-=======
 
-
-
->>>>>>> de48903ed550643542b229580638f9bfc52d4866

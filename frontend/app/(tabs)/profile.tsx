@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -12,7 +11,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
+import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
 
 export default function ProfileScreen() {
   const { width } = useWindowDimensions();
@@ -34,7 +34,7 @@ export default function ProfileScreen() {
 
   const loadProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = firebaseAuth.currentUser;
 
       if (!user) {
         setIsLoggedIn(false);
@@ -45,11 +45,7 @@ export default function ProfileScreen() {
       setEmail(user.email || '');
       setIsLoggedIn(true);
 
-      const { data } = await supabase
-        .from('nguoi_dung')
-        .select('ho_ten, so_dien_thoai, vai_tro, ngay_tao')
-        .eq('ma_nguoi_dung', user.id)
-        .maybeSingle();
+      const { data } = await backendApi.get('/api/users/me');
 
       if (data) {
         setHoTen(data.ho_ten || '');
@@ -66,9 +62,10 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
+    const { signOut } = await import('firebase/auth');
     const doLogout = async () => {
       setLoggingOut(true);
-      await supabase.auth.signOut();
+      await signOut(firebaseAuth);
       setIsLoggedIn(false);
       setHoTen('');
       setEmail('');
@@ -338,23 +335,12 @@ export default function ProfileScreen() {
         <Text style={styles.footerNote}>© 2026 Hệ thống Quản lý và Tìm kiếm Phòng trọ</Text>
       </View>
     </ScrollView>
-=======
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-
-export default function ProfileScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Màn hình cá nhân đang được phát triển...</Text>
-    </View>
->>>>>>> de48903ed550643542b229580638f9bfc52d4866
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-<<<<<<< HEAD
     backgroundColor: '#F5F7FB',
   },
   scrollContent: {
@@ -656,14 +642,6 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     marginBottom: 30,
-=======
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  text: {
-    fontSize: 16,
-    color: '#64748B',
->>>>>>> de48903ed550643542b229580638f9bfc52d4866
   },
 });
+

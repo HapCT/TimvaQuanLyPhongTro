@@ -1,21 +1,21 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  useWindowDimensions,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
-import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
-import { styles } from '@/styles/admin/admin-users.styles';
 import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
+import { styles } from '@/styles/admin/admin-users.styles';
 import { showAlert } from '@/utils/alert';
+import { router } from 'expo-router';
 
 type User = {
   ma_nguoi_dung: string;
@@ -54,24 +54,18 @@ export default function AdminUsersScreen() {
 
   const checkAdmin = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = firebaseAuth.currentUser;
 
       if (!user) {
         router.replace('/login');
         return;
       }
 
-      const { data, error } = await supabase
-        .from('nguoi_dung')
-        .select('vai_tro')
-        .eq('ma_nguoi_dung', user.id)
-        .single();
+      const { data, status } = await backendApi.get('/api/users/me');
 
-      if (error || !data) {
+      if (status !== 200 || !data) {
         Alert.alert('Lỗi', 'Không tìm thấy thông tin người dùng.');
-        router.replace('/home');
+        router.replace('/(tabs)');
         return;
       }
 
@@ -81,7 +75,7 @@ export default function AdminUsersScreen() {
           'Bạn không có quyền truy cập trang quản trị.'
         );
 
-        router.replace('/home');
+        router.replace('/(tabs)');
         return;
       }
 
@@ -167,29 +161,7 @@ export default function AdminUsersScreen() {
           text: 'Xác nhận',
           onPress: async () => {
             try {
-              const { error } = await supabase
-                .from('nguoi_dung')
-                .update({
-                  vai_tro: newRole,
-                })
-                .eq(
-                  'ma_nguoi_dung',
-                  user.ma_nguoi_dung
-                );
-
-              if (error) {
-                console.log(
-                  'CHANGE ROLE ERROR:',
-                  error
-                );
-
-                Alert.alert(
-                  'Lỗi',
-                  'Không thể thay đổi vai trò.'
-                );
-
-                return;
-              }
+              await backendApi.put(`/api/users/${user.ma_nguoi_dung}/role`, { vai_tro: newRole });
 
               Alert.alert(
                 'Thành công',
@@ -230,12 +202,10 @@ export default function AdminUsersScreen() {
           style: isLocking ? 'destructive' : 'default',
           onPress: async () => {
             try {
-              const {
-                data: { user: currentUser },
-              } = await supabase.auth.getUser();
+              const currentUser = firebaseAuth.currentUser;
 
               // Không cho Admin tự khóa chính mình
-              if (currentUser?.id === user.ma_nguoi_dung) {
+              if (currentUser?.uid === user.ma_nguoi_dung) {
                 showAlert(
                   'Không hợp lệ',
                   'Bạn không thể tự khóa tài khoản Admin đang đăng nhập.'

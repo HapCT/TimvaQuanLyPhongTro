@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-import { supabase } from '@/services/supabase';
+import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
 import { User, RoleFilter } from '@/types';
 import { styles } from '@/styles/admin/users-management.styles';
@@ -44,8 +44,8 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
 
   const loadCurrentAdmin = async () => {
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user) setCurrentAdminId(authData.user.id);
+      const user = firebaseAuth.currentUser;
+      if (user) setCurrentAdminId(user.uid);
     } catch (e) {
       console.log('GET CURRENT ADMIN ERROR:', e);
     }
