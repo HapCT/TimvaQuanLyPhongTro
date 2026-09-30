@@ -46,7 +46,7 @@ export default function LoginScreen() {
             router.replace('/admin');
             return;
           } else if (role === 'ChuTro') {
-            router.replace('/(landlord)' as any);
+            router.replace('/(landlord)/phong-tro' as any);
             return;
           } else if (role === 'NguoiThue') {
             router.replace('/(tabs)');
@@ -128,7 +128,7 @@ export default function LoginScreen() {
         }
 
         if (vaiTro === 'ChuTro') {
-          router.replace('/(landlord)' as any);
+          router.replace('/(landlord)/phong-tro' as any);
           return;
         }
 

@@ -17,6 +17,7 @@ export const styles = StyleSheet.create({
 
   sidebar: {
     width: 250,
+    flexDirection: 'column',
     backgroundColor: '#FFFFFF',
     paddingTop: 30,
     paddingHorizontal: 15,
@@ -236,6 +237,27 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     color: '#888',
     marginTop: 5,
+  },
+
+  refreshButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: '#DDE1E6',
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+  },
+
+  refreshText: {
+    color: '#007AFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  resultNumber: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 
   primaryButton: {

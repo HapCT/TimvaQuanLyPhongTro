@@ -19,18 +19,26 @@ async function resolveUser(req) {
   );
 
   if (!rows[0]) {
-    // Tự động tạo record trong MySQL nếu người dùng mới đăng nhập Firebase chưa có record
+    // Người dùng mới đăng nhập Firebase lần đầu -> tạo record MySQL với quyền thấp nhất.
+    // KHÔNG bao giờ tự cấp QuanTri ở đây (kể cả email có chữ "admin").
+    // Muốn có admin: cập nhật thủ công trong DB (xem hướng dẫn) hoặc dùng API đổi vai trò của admin.
     const email = decoded.email || '';
-    const isDbAdmin = email.toLowerCase().includes('admin');
-    const defaultRole = isDbAdmin ? 'QuanTri' : 'NguoiThue';
+    const defaultRole = 'NguoiThue';
 
+    // ON DUPLICATE ... no-op: nếu 2 request chạy song song thì không ghi đè vai trò đã có.
     await pool.query(
-      `INSERT INTO nguoi_dung (ma_nguoi_dung, email, ho_ten, vai_tro) 
-       VALUES (?, ?, ?, ?) 
-       ON DUPLICATE KEY UPDATE vai_tro = VALUES(vai_tro)`,
+      `INSERT INTO nguoi_dung (ma_nguoi_dung, email, ho_ten, vai_tro)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE ma_nguoi_dung = ma_nguoi_dung`,
       [decoded.uid, email || null, decoded.name || email || 'Người dùng', defaultRole]
     );
-    return { id: decoded.uid, role: defaultRole };
+
+    // Đọc lại để lấy đúng vai trò thật trong DB
+    const [again] = await pool.query(
+      'SELECT vai_tro FROM nguoi_dung WHERE ma_nguoi_dung = ? LIMIT 1',
+      [decoded.uid]
+    );
+    return { id: decoded.uid, role: normalizeRole(again[0]?.vai_tro || defaultRole) };
   }
 
   return { id: decoded.uid, role: normalizeRole(rows[0]?.vai_tro) };
@@ -51,7 +59,8 @@ const requireAuth = async (req, res, next) => {
     if (!user) return res.status(401).json({ error: 'Bạn cần đăng nhập.' });
     req.user = user;
     next();
-  } catch (_error) {
+  } catch (error) {
+    console.error('AUTH ERROR:', error.code, error.message);
     res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn.' });
   }
 };
@@ -68,7 +77,8 @@ const requireRole = (...roles) => async (req, res, next) => {
 
     req.user = user;
     next();
-  } catch (_error) {
+  } catch (error) {
+    console.error('AUTH ERROR:', error.code, error.message);
     res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn.' });
   }
 };

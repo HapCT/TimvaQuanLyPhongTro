@@ -1,73 +1,54 @@
 const pool = require('../config/db');
+const { notifyUser } = require('../services/notifications');
 
 const getAll = async (req, res) => {
   try {
-    const { chuTroId } = req.query;
-
     let sql = `
-      SELECT
-        dp.*,
-        nd.ho_ten AS nd_ho_ten,
-        nd.so_dien_thoai AS nd_so_dien_thoai,
-        nd.anh_dai_dien AS nd_anh_dai_dien,
-        pt.tieu_de AS pt_tieu_de,
-        pt.so_phong AS pt_so_phong,
-        pt.gia_thue AS pt_gia_thue,
-        pt.ma_khu_tro AS pt_ma_khu_tro
+      SELECT dp.*,
+             nd.ho_ten AS nguoi_thue_ho_ten,
+             nd.so_dien_thoai AS nguoi_thue_so_dien_thoai,
+             nd.anh_dai_dien AS nguoi_thue_anh_dai_dien,
+             p.tieu_de AS phong_tieu_de,
+             p.so_phong AS phong_so_phong,
+             p.gia_thue AS phong_gia_thue,
+             p.ma_khu_tro,
+             k.ten_khu_tro,
+             k.dia_chi AS khu_tro_dia_chi
       FROM dat_phong dp
       LEFT JOIN nguoi_dung nd ON nd.ma_nguoi_dung = dp.ma_nguoi_thue
-      LEFT JOIN phong_tro pt ON pt.ma_phong = dp.ma_phong
+      LEFT JOIN phong_tro p ON p.ma_phong = dp.ma_phong
+      LEFT JOIN khu_tro k ON k.ma_khu_tro = p.ma_khu_tro
     `;
     const params = [];
 
-    if (chuTroId) {
-      const [khuTroRows] = await pool.query(
-        'SELECT ma_khu_tro FROM khu_tro WHERE ma_chu_tro = ?',
-        [chuTroId]
-      );
-      const khuTroIds = khuTroRows.map((k) => k.ma_khu_tro);
-      if (khuTroIds.length === 0) return res.json([]);
-
-      const [phongRows] = await pool.query(
-        `SELECT ma_phong FROM phong_tro WHERE ma_khu_tro IN (?)`,
-        [khuTroIds]
-      );
-      const maPhongIds = phongRows.map((p) => p.ma_phong);
-      if (maPhongIds.length === 0) return res.json([]);
-
-      sql += ' WHERE dp.ma_phong IN (?)';
-      params.push(maPhongIds);
+    if (req.user.role === 'ChuTro') {
+      sql += ' WHERE k.ma_chu_tro = ?';
+      params.push(req.user.id);
+    } else if (req.user.role !== 'QuanTri') {
+      sql += ' WHERE dp.ma_nguoi_thue = ?';
+      params.push(req.user.id);
     }
 
     sql += ' ORDER BY dp.ngay_tao DESC';
 
-    const [bookings] = await pool.query(sql, params);
+    const [rows] = await pool.query(sql, params);
 
-    const result = bookings.map((b) => ({
-      ma_phong: b.ma_phong,
-      ma_nguoi_thue: b.ma_nguoi_thue,
-      ngay_dat: b.ngay_dat,
-      ngay_du_kien_nhan_phong: b.ngay_du_kien_nhan_phong,
-      ghi_chu: b.ghi_chu,
-      trang_thai: b.trang_thai,
-      ngay_tao: b.ngay_tao,
-      ngay_cap_nhat: b.ngay_cap_nhat,
-      ma_dat_phong: b.ma_dat_phong,
-      ma_dat_lich: b.ma_dat_phong,
-      nguoi_dung: {
-        ho_ten: b.nd_ho_ten,
-        so_dien_thoai: b.nd_so_dien_thoai,
-        anh_dai_dien: b.nd_anh_dai_dien,
-      },
-      phong_tro: {
-        tieu_de: b.pt_tieu_de,
-        so_phong: b.pt_so_phong,
-        gia_thue: b.pt_gia_thue,
-        ma_khu_tro: b.pt_ma_khu_tro,
-      },
-      ho_ten: b.nd_ho_ten || 'Khách xem phòng',
-      so_dien_thoai: b.nd_so_dien_thoai || 'Chưa cập nhật',
+    // Map kết quả tương thích cho frontend
+    const result = rows.map((b) => ({
+      ...b,
+      ma_dat_lich: b.ma_dat_phong, // backward compatibility
+      ho_ten: b.nguoi_thue_ho_ten || 'Khách đặt phòng',
+      so_dien_thoai: b.nguoi_thue_so_dien_thoai || 'Chưa cập nhật',
       ngay_xem: b.ngay_du_kien_nhan_phong || b.ngay_dat,
+      phong_tro: {
+        ma_phong: b.ma_phong,
+        tieu_de: b.phong_tieu_de,
+        so_phong: b.phong_so_phong,
+        gia_thue: b.phong_gia_thue,
+        ma_khu_tro: b.ma_khu_tro,
+        ten_khu_tro: b.ten_khu_tro,
+        dia_chi: b.khu_tro_dia_chi,
+      },
     }));
 
     res.json(result);
@@ -79,49 +60,65 @@ const getAll = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const { ma_phong, ma_nguoi_thue, ngay_du_kien_nhan_phong, ghi_chu, ho_ten, so_dien_thoai } = req.body;
-    const now = new Date();
+    const { ma_phong, ngay_du_kien_nhan_phong, so_nguoi, ghi_chu } = req.body;
 
-    let uid = req.user?.id || ma_nguoi_thue;
-
-    // Nếu không có uid (khách chưa đăng nhập), tự sinh mã khách tạm
-    if (!uid) {
-      uid = `GUEST_${Date.now()}`;
+    if (!ma_phong) {
+      return res.status(400).json({ error: 'Thiếu mã phòng.' });
     }
 
-    // Đảm bảo nguoi_dung có tồn tại để thỏa mãn khóa ngoại fk_dat_phong_nguoi_thue
-    const [rows] = await pool.query('SELECT ma_nguoi_dung FROM nguoi_dung WHERE ma_nguoi_dung = ? LIMIT 1', [uid]);
-    if (rows.length === 0) {
-      await pool.query(
-        `INSERT INTO nguoi_dung (ma_nguoi_dung, ho_ten, so_dien_thoai, vai_tro) 
-         VALUES (?, ?, ?, ?) 
-         ON DUPLICATE KEY UPDATE ho_ten = VALUES(ho_ten), so_dien_thoai = VALUES(so_dien_thoai)`,
-        [uid, ho_ten || 'Khách xem phòng', so_dien_thoai || null, 'NguoiThue']
-      );
+    const [roomRows] = await pool.query(
+      `SELECT p.ma_phong, p.trang_thai, p.trang_thai_duyet, k.ma_chu_tro
+       FROM phong_tro p JOIN khu_tro k ON k.ma_khu_tro = p.ma_khu_tro
+       WHERE p.ma_phong = ? LIMIT 1`,
+      [ma_phong]
+    );
+    if (!roomRows[0]) return res.status(404).json({ error: 'Không tìm thấy phòng trọ.' });
+    if (roomRows[0].trang_thai_duyet !== 'DaDuyet') {
+      return res.status(400).json({ error: 'Phòng chưa được duyệt đăng.' });
+    }
+    if (roomRows[0].trang_thai !== 'ConTrong') {
+      return res.status(409).json({ error: 'Phòng hiện không còn trống.' });
     }
 
-    const newBooking = {
-      ma_phong,
-      ma_nguoi_thue: uid,
-      ngay_dat: now,
-      ngay_du_kien_nhan_phong: ngay_du_kien_nhan_phong || now,
-      ghi_chu: ghi_chu || null,
-      trang_thai: 'ChoDuyet',
-      ngay_tao: now,
-      ngay_cap_nhat: now,
-    };
+    const [approvedRows] = await pool.query(
+      "SELECT ma_dat_phong FROM dat_phong WHERE ma_phong = ? AND trang_thai = 'DaDuyet' LIMIT 1",
+      [ma_phong]
+    );
+    if (approvedRows[0]) {
+      return res.status(409).json({ error: 'Phòng đã có yêu cầu được chấp nhận.' });
+    }
 
-    const [result] = await pool.query('INSERT INTO dat_phong SET ?', [newBooking]);
-    const [createdRows] = await pool.query(
-      'SELECT * FROM dat_phong WHERE ma_dat_phong = ?',
-      [result.insertId]
+    const peopleCount = Number(so_nguoi || 1);
+    if (!Number.isInteger(peopleCount) || peopleCount < 1) {
+      return res.status(400).json({ error: 'Số người thuê phải lớn hơn 0.' });
+    }
+
+    const [existingRows] = await pool.query(
+      `SELECT ma_dat_phong FROM dat_phong
+       WHERE ma_phong = ? AND ma_nguoi_thue = ? AND trang_thai = 'ChoDuyet' LIMIT 1`,
+      [ma_phong, req.user.id]
+    );
+    if (existingRows[0]) {
+      return res.status(409).json({ error: 'Bạn đã có yêu cầu đang chờ duyệt cho phòng này.' });
+    }
+
+    const [result] = await pool.query(
+      `INSERT INTO dat_phong (ma_phong, ma_nguoi_thue, ngay_du_kien_nhan_phong, so_nguoi, ghi_chu, trang_thai)
+       VALUES (?, ?, ?, ?, ?, 'ChoDuyet')`,
+      [ma_phong, req.user.id, ngay_du_kien_nhan_phong || null, peopleCount, ghi_chu || null]
     );
 
-    console.log('✅ ĐÃ LƯU ĐẶT LỊCH XEM PHÒNG VÀO DATABASE! ID:', result.insertId);
-    res.status(201).json(createdRows[0]);
+    const [rows] = await pool.query('SELECT * FROM dat_phong WHERE ma_dat_phong = ?', [result.insertId]);
+    await notifyUser({
+      userId: roomRows[0].ma_chu_tro,
+      title: 'Yêu cầu thuê phòng mới',
+      body: 'Có người thuê vừa gửi yêu cầu cho phòng của bạn.',
+      type: 'DatPhong',
+    });
+    res.status(201).json(rows[0]);
   } catch (error) {
-    console.error('LỖI TAO DAT PHONG:', error);
-    res.status(500).json({ error: error.message });
+    console.error('CREATE DAT PHONG ERROR:', error);
+    res.status(400).json({ error: error.message });
   }
 };
 
@@ -130,15 +127,49 @@ const updateStatus = async (req, res) => {
     const { id } = req.params;
     const { trang_thai } = req.body;
 
-    await pool.query(
-      'UPDATE dat_phong SET ? WHERE ma_dat_phong = ?',
-      [{ trang_thai, ngay_cap_nhat: new Date() }, id]
-    );
-    const [rows] = await pool.query(
-      'SELECT * FROM dat_phong WHERE ma_dat_phong = ?',
+    if (!['DaDuyet', 'TuChoi'].includes(trang_thai)) {
+      return res.status(400).json({ error: 'Trạng thái phải là DaDuyet hoặc TuChoi.' });
+    }
+
+    const [requestRows] = await pool.query(
+      `SELECT dp.trang_thai, dp.ma_phong, dp.ma_nguoi_thue, k.ma_chu_tro
+       FROM dat_phong dp
+       JOIN phong_tro p ON p.ma_phong = dp.ma_phong
+       JOIN khu_tro k ON k.ma_khu_tro = p.ma_khu_tro
+       WHERE dp.ma_dat_phong = ? LIMIT 1`,
       [id]
     );
+    const request = requestRows[0];
+    if (!request) return res.status(404).json({ error: 'Không tìm thấy yêu cầu đặt phòng.' });
+    if (req.user.role !== 'QuanTri' && String(request.ma_chu_tro) !== String(req.user.id)) {
+      return res.status(403).json({ error: 'Yêu cầu này không thuộc phòng của bạn.' });
+    }
+    if (request.trang_thai !== 'ChoDuyet') {
+      return res.status(409).json({ error: 'Yêu cầu đã được xử lý trước đó.' });
+    }
+    if (trang_thai === 'DaDuyet') {
+      const [approvedRows] = await pool.query(
+        "SELECT ma_dat_phong FROM dat_phong WHERE ma_phong = ? AND trang_thai = 'DaDuyet' LIMIT 1",
+        [request.ma_phong]
+      );
+      if (approvedRows[0]) {
+        return res.status(409).json({ error: 'Phòng đã có một yêu cầu đặt được chấp nhận.' });
+      }
+    }
 
+    const [updateResult] = await pool.query(
+      'UPDATE dat_phong SET trang_thai = ? WHERE ma_dat_phong = ? AND trang_thai = \'ChoDuyet\'',
+      [trang_thai, id]
+    );
+    if (updateResult.affectedRows === 0) return res.status(409).json({ error: 'Yêu cầu vừa được xử lý ở nơi khác.' });
+
+    const [rows] = await pool.query('SELECT * FROM dat_phong WHERE ma_dat_phong = ?', [id]);
+    await notifyUser({
+      userId: request.ma_nguoi_thue,
+      title: trang_thai === 'DaDuyet' ? 'Yêu cầu thuê đã được duyệt' : 'Yêu cầu thuê bị từ chối',
+      body: trang_thai === 'DaDuyet' ? 'Chủ trọ đã chấp nhận yêu cầu thuê phòng của bạn.' : 'Chủ trọ đã từ chối yêu cầu thuê phòng của bạn.',
+      type: 'DatPhong',
+    });
     res.json(rows[0] || { success: true, trang_thai });
   } catch (error) {
     console.error('UPDATE STATUS CATCH ERROR:', error);
@@ -146,8 +177,4 @@ const updateStatus = async (req, res) => {
   }
 };
 
-module.exports = {
-  getAll,
-  create,
-  updateStatus,
-};
+module.exports = { getAll, create, updateStatus };

@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  ActivityIndicator,
+    ActivityIndicator,
+    Image,
+    Modal,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
-import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
-import { KhuTro } from '@/types';
+import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/admin/room-form.styles';
+import { KhuTro } from '@/types';
 import { showAlert } from '@/utils/alert';
-import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToSupabase } from '@/utils/upload';
+import * as ImagePicker from 'expo-image-picker';
 
 interface KhuTroFormModalProps {
   visible: boolean;
@@ -41,13 +41,46 @@ export default function KhuTroFormModal({
   const [moTa, setMoTa] = useState('');
   const [anhDaiDien, setAnhDaiDien] = useState('');
   const [trangThai, setTrangThai] = useState('HoatDong');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(false);
+  const [ownerOptions, setOwnerOptions] = useState<any[]>([]);
+  const [selectedOwnerId, setSelectedOwnerId] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    setCheckingAdmin(true);
+
+    const loadAdminOwners = async () => {
+      try {
+        const { data: profile } = await backendApi.get('/api/users/me');
+        const admin = profile?.vai_tro === 'Admin' || profile?.vai_tro === 'QuanTri';
+        if (!active) return;
+        setIsAdmin(admin);
+        if (admin) {
+          const { data } = await backendApi.get('/api/users');
+          if (active) setOwnerOptions((data || []).filter((user: any) => user.vai_tro === 'ChuTro'));
+        }
+      } catch (error) {
+        console.log('LOAD khu tro owners ERROR:', error);
+      } finally {
+        if (active) setCheckingAdmin(false);
+      }
+    };
+
+    loadAdminOwners();
+    return () => {
+      active = false;
+    };
+  }, [visible]);
+
+  useEffect(() => {
     if (visible) {
       if (isEdit && editingKhuTro) {
+        setSelectedOwnerId(editingKhuTro.ma_chu_tro || '');
         setTenKhuTro(editingKhuTro.ten_khu_tro || '');
         setDiaChi(editingKhuTro.dia_chi || '');
         setPhuong(editingKhuTro.phuong || '');
@@ -57,10 +90,11 @@ export default function KhuTroFormModal({
         setAnhDaiDien(editingKhuTro.anh_dai_dien || '');
         setTrangThai(editingKhuTro.trang_thai || 'HoatDong');
       } else {
+        setSelectedOwnerId('');
         resetForm();
       }
     }
-  }, [visible, editingKhuTro]);
+  }, [visible, editingKhuTro, isEdit]);
 
   const resetForm = () => {
     setTenKhuTro('');
@@ -114,6 +148,7 @@ export default function KhuTroFormModal({
   };
 
   const handleSave = async () => {
+    if (checkingAdmin) return;
     if (!validate()) return;
     setLoading(true);
 
@@ -126,6 +161,11 @@ export default function KhuTroFormModal({
         return;
       }
 
+      if (isAdmin && !isEdit && !selectedOwnerId) {
+        showAlert('Thiếu chủ trọ', 'Hãy chọn chủ trọ sở hữu khu trọ này.');
+        return;
+      }
+
       const payload = {
         ten_khu_tro: tenKhuTro.trim(),
         dia_chi: diaChi.trim(),
@@ -135,7 +175,7 @@ export default function KhuTroFormModal({
         mo_ta: moTa.trim(),
         anh_dai_dien: anhDaiDien.trim() || null,
         trang_thai: trangThai,
-        ma_chu_tro: userId,
+        ma_chu_tro: isAdmin ? selectedOwnerId : userId,
       };
 
       if (isEdit) {
@@ -173,6 +213,35 @@ export default function KhuTroFormModal({
 
           {/* BODY */}
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+
+            {isAdmin && !isEdit && (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Chủ trọ sở hữu *</Text>
+                {ownerOptions.length === 0 ? (
+                  <Text style={{ color: '#888', fontSize: 13 }}>Chưa có tài khoản chủ trọ để chọn.</Text>
+                ) : (
+                  <View style={{ gap: 6 }}>
+                    {ownerOptions.map((owner) => (
+                      <TouchableOpacity
+                        key={owner.ma_nguoi_dung}
+                        onPress={() => setSelectedOwnerId(owner.ma_nguoi_dung)}
+                        style={{
+                          padding: 10,
+                          borderWidth: 1,
+                          borderColor: selectedOwnerId === owner.ma_nguoi_dung ? '#007AFF' : '#E5E7EB',
+                          borderRadius: 6,
+                          backgroundColor: selectedOwnerId === owner.ma_nguoi_dung ? '#EAF3FF' : '#FFFFFF',
+                        }}
+                      >
+                        <Text style={{ color: '#333', fontSize: 13 }}>
+                          {owner.ho_ten || 'Chủ trọ'}{owner.email ? ` · ${owner.email}` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
             
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Ảnh đại diện</Text>
@@ -315,9 +384,9 @@ export default function KhuTroFormModal({
             <TouchableOpacity 
               style={[styles.saveBtn, loading && styles.saveBtnDisabled]} 
               onPress={handleSave} 
-              disabled={loading}
+              disabled={loading || checkingAdmin}
             >
-              {loading ? (
+              {loading || checkingAdmin ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
                 <Text style={styles.saveBtnText}>{isEdit ? 'Lưu thay đổi' : 'Thêm khu trọ'}</Text>

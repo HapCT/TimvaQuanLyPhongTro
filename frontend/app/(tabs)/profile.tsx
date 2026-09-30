@@ -1,18 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  StyleSheet,
-  Alert,
-  Platform,
-  useWindowDimensions,
-} from 'react-native';
-import { router } from 'expo-router';
 import { backendApi } from '@/services/backend';
 import { firebaseAuth } from '@/services/firebase';
+import { showAlert } from '@/utils/alert';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from 'react-native';
 
 export default function ProfileScreen() {
   const { width } = useWindowDimensions();
@@ -27,6 +30,10 @@ export default function ProfileScreen() {
   const [soDienThoai, setSoDienThoai] = useState('');
   const [vaiTro, setVaiTro] = useState('');
   const [ngayTao, setNgayTao] = useState('');
+  const [editVisible, setEditVisible] = useState(false);
+  const [editHoTen, setEditHoTen] = useState('');
+  const [editSoDienThoai, setEditSoDienThoai] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -58,6 +65,39 @@ export default function ProfileScreen() {
       setIsLoggedIn(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openEditProfile = () => {
+    setEditHoTen(hoTen);
+    setEditSoDienThoai(soDienThoai);
+    setEditVisible(true);
+  };
+
+  const saveProfile = async () => {
+    if (editHoTen.trim().length < 2) {
+      showAlert('Thông tin chưa hợp lệ', 'Họ tên phải có ít nhất 2 ký tự.');
+      return;
+    }
+    if (editSoDienThoai.trim() && !/^0[0-9]{9}$/.test(editSoDienThoai.trim())) {
+      showAlert('Thông tin chưa hợp lệ', 'Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0.');
+      return;
+    }
+
+    try {
+      setSavingProfile(true);
+      const { data } = await backendApi.put('/api/users/me', {
+        ho_ten: editHoTen.trim(),
+        so_dien_thoai: editSoDienThoai.trim(),
+      });
+      setHoTen(data.ho_ten || '');
+      setSoDienThoai(data.so_dien_thoai || '');
+      setEditVisible(false);
+      showAlert('Đã cập nhật', 'Thông tin hồ sơ của bạn đã được lưu.');
+    } catch (error: any) {
+      showAlert('Lỗi', error?.response?.data?.error || 'Không thể cập nhật hồ sơ.');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -210,7 +250,7 @@ export default function ProfileScreen() {
         {(vaiTro === 'ChuTro') && (
           <TouchableOpacity
             style={styles.portalBanner}
-            onPress={() => router.push('/(landlord)' as any)}
+            onPress={() => router.push('/(landlord)/phong-tro' as any)}
           >
             <View style={styles.portalIconBox}>
               <Text style={{ fontSize: 24 }}>🏢</Text>
@@ -239,9 +279,28 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
 
+        <TouchableOpacity
+          style={[styles.portalBanner, { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' }]}
+          onPress={() => router.push('/ho-tro' as any)}
+        >
+          <View style={[styles.portalIconBox, { backgroundColor: '#DBEAFE' }]}>
+            <Text style={{ fontSize: 24 }}>?</Text>
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={[styles.portalTitle, { color: '#1D4ED8' }]}>Yêu cầu hỗ trợ</Text>
+            <Text style={styles.portalSub}>Gửi câu hỏi và theo dõi phản hồi</Text>
+          </View>
+          <Text style={[styles.portalArrow, { color: '#1D4ED8' }]}>→</Text>
+        </TouchableOpacity>
+
         {/* THÔNG TIN CHI TIẾT */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Thông tin tài khoản</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <Text style={styles.sectionTitle}>Thông tin tài khoản</Text>
+            <TouchableOpacity onPress={openEditProfile}>
+              <Text style={{ color: '#2563EB', fontSize: 13, fontWeight: '600' }}>Chỉnh sửa</Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.infoRow}>
             <View style={styles.iconCircle}>
@@ -317,6 +376,55 @@ export default function ProfileScreen() {
             <Text style={styles.actionText}>Tìm kiếm & Lọc phòng trọ</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
+
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/(tabs)/thong-bao' as any)}>
+            <View style={[styles.iconCircle, { backgroundColor: '#EEF5FF' }]}>
+              <Text style={{ fontSize: 16 }}>🔔</Text>
+            </View>
+            <Text style={styles.actionText}>Thông báo</Text>
+            <Text style={styles.actionArrow}>›</Text>
+          </TouchableOpacity>
+
+          {vaiTro === 'NguoiThue' && (
+            <>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/yeu-cau-dat-phong' as any)}>
+                <View style={[styles.iconCircle, { backgroundColor: '#F0FDF4' }]}>
+                  <Text style={{ fontSize: 16 }}>📋</Text>
+                </View>
+                <Text style={styles.actionText}>Yêu cầu đặt phòng của tôi</Text>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/dat-lich-cua-toi' as any)}>
+                <View style={[styles.iconCircle, { backgroundColor: '#EEF5FF' }]}>
+                  <Text style={{ fontSize: 16 }}>📅</Text>
+                </View>
+                <Text style={styles.actionText}>Lịch hẹn xem phòng của tôi</Text>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/hop-dong-cua-toi' as any)}>
+                <View style={[styles.iconCircle, { backgroundColor: '#FEF3C7' }]}>
+                  <Text style={{ fontSize: 16 }}>📄</Text>
+                </View>
+                <Text style={styles.actionText}>Hợp đồng & thanh toán của tôi</Text>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/danh-gia-cua-toi' as any)}>
+                <View style={[styles.iconCircle, { backgroundColor: '#FFF7ED' }]}>
+                  <Text style={{ fontSize: 16 }}>★</Text>
+                </View>
+                <Text style={styles.actionText}>Đánh giá của tôi</Text>
+                <Text style={styles.actionArrow}>›</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* NÚT ĐĂNG XUẤT */}
@@ -334,6 +442,36 @@ export default function ProfileScreen() {
 
         <Text style={styles.footerNote}>© 2026 Hệ thống Quản lý và Tìm kiếm Phòng trọ</Text>
       </View>
+      <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 10, padding: 20, gap: 12 }}>
+            <Text style={{ color: '#111827', fontSize: 18, fontWeight: '700' }}>Sửa thông tin cá nhân</Text>
+            <TextInput
+              value={editHoTen}
+              onChangeText={setEditHoTen}
+              placeholder="Họ và tên"
+              maxLength={255}
+              style={{ height: 44, borderWidth: 1, borderColor: '#DDE1E6', borderRadius: 6, paddingHorizontal: 12 }}
+            />
+            <TextInput
+              value={editSoDienThoai}
+              onChangeText={setEditSoDienThoai}
+              placeholder="Số điện thoại"
+              keyboardType="phone-pad"
+              maxLength={10}
+              style={{ height: 44, borderWidth: 1, borderColor: '#DDE1E6', borderRadius: 6, paddingHorizontal: 12 }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity onPress={() => setEditVisible(false)} disabled={savingProfile} style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+                <Text style={{ color: '#4B5563' }}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveProfile} disabled={savingProfile} style={{ minWidth: 90, alignItems: 'center', backgroundColor: '#2563EB', borderRadius: 6, paddingHorizontal: 14, paddingVertical: 10 }}>
+                {savingProfile ? <ActivityIndicator color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Lưu</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }

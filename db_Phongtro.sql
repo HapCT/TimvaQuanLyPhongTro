@@ -160,7 +160,27 @@ CREATE TABLE IF NOT EXISTS dat_phong (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------
--- 9. Hop dong
+-- 9. Lich hen xem phong
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dat_lich_xem (
+  ma_dat_lich      INT AUTO_INCREMENT PRIMARY KEY,
+  ma_phong         INT NOT NULL,
+  ma_nguoi_thue    VARCHAR(128) NOT NULL,
+  thoi_gian_hen    DATETIME NOT NULL,
+  so_dien_thoai    VARCHAR(20) NOT NULL,
+  ghi_chu          TEXT NULL,
+  trang_thai       VARCHAR(20) NOT NULL DEFAULT 'ChoXacNhan',
+  ngay_tao         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  ngay_cap_nhat    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_dlx_phong FOREIGN KEY (ma_phong)
+    REFERENCES phong_tro(ma_phong) ON DELETE CASCADE,
+  CONSTRAINT fk_dlx_nguoi_thue FOREIGN KEY (ma_nguoi_thue)
+    REFERENCES nguoi_dung(ma_nguoi_dung) ON DELETE CASCADE,
+  CONSTRAINT chk_dlx_trang_thai CHECK (trang_thai IN ('ChoXacNhan', 'ChoKhachXacNhan', 'DaXacNhan', 'DaXem', 'TuChoi', 'DaHuy'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------
+-- 10. Hop dong
 -- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS hop_dong (
   ma_hop_dong     INT AUTO_INCREMENT PRIMARY KEY,
@@ -205,7 +225,66 @@ CREATE TABLE IF NOT EXISTS thanh_toan (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------
--- 11. Danh gia
+-- 11. Hoa don theo ky hop dong
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS hoa_don (
+  ma_hoa_don       INT AUTO_INCREMENT PRIMARY KEY,
+  ma_hop_dong      INT NOT NULL,
+  ky_thanh_toan    DATE NOT NULL,
+  han_thanh_toan   DATE NOT NULL,
+  tien_phong       DECIMAL(14,0) NOT NULL,
+  chi_so_dien_cu   DECIMAL(12,3) NOT NULL DEFAULT 0,
+  chi_so_dien_moi  DECIMAL(12,3) NOT NULL DEFAULT 0,
+  don_gia_dien     DECIMAL(14,0) NOT NULL DEFAULT 0,
+  tien_dien        DECIMAL(14,0) NOT NULL DEFAULT 0,
+  chi_so_nuoc_cu   DECIMAL(12,3) NOT NULL DEFAULT 0,
+  chi_so_nuoc_moi  DECIMAL(12,3) NOT NULL DEFAULT 0,
+  don_gia_nuoc     DECIMAL(14,0) NOT NULL DEFAULT 0,
+  tien_nuoc        DECIMAL(14,0) NOT NULL DEFAULT 0,
+  phi_khac         DECIMAL(14,0) NOT NULL DEFAULT 0,
+  tong_tien        DECIMAL(14,0) NOT NULL,
+  ghi_chu          TEXT NULL,
+  nguoi_tao        VARCHAR(128) NULL,
+  ngay_tao         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hoa_don_hop_dong_ky (ma_hop_dong, ky_thanh_toan),
+  CONSTRAINT fk_hoa_don_hop_dong FOREIGN KEY (ma_hop_dong)
+    REFERENCES hop_dong(ma_hop_dong) ON DELETE CASCADE,
+  CONSTRAINT fk_hoa_don_nguoi_tao FOREIGN KEY (nguoi_tao)
+    REFERENCES nguoi_dung(ma_nguoi_dung) ON DELETE SET NULL,
+  CONSTRAINT chk_hoa_don_tien CHECK (tien_phong >= 0 AND tien_dien >= 0 AND tien_nuoc >= 0 AND phi_khac >= 0 AND tong_tien >= 0),
+  CONSTRAINT chk_hoa_don_chi_so CHECK (chi_so_dien_moi >= chi_so_dien_cu AND chi_so_nuoc_moi >= chi_so_nuoc_cu)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------
+-- 12. Khoan thanh toan cua hoa don
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS thanh_toan_hoa_don (
+  ma_thanh_toan      INT AUTO_INCREMENT PRIMARY KEY,
+  ma_hoa_don         INT NOT NULL,
+  ma_nguoi_nop       VARCHAR(128) NULL,
+  nguoi_tao          VARCHAR(128) NULL,
+  nguoi_xac_nhan     VARCHAR(128) NULL,
+  so_tien            DECIMAL(14,0) NOT NULL,
+  phuong_thuc        VARCHAR(50) NOT NULL,
+  ma_giao_dich       VARCHAR(150) NULL,
+  noi_dung           TEXT NULL,
+  trang_thai         VARCHAR(20) NOT NULL DEFAULT 'ChoXacNhan',
+  ngay_tao            DATETIME DEFAULT CURRENT_TIMESTAMP,
+  ngay_xac_nhan       DATETIME NULL,
+  CONSTRAINT fk_tthd_hoa_don FOREIGN KEY (ma_hoa_don)
+    REFERENCES hoa_don(ma_hoa_don) ON DELETE CASCADE,
+  CONSTRAINT fk_tthd_nguoi_nop FOREIGN KEY (ma_nguoi_nop)
+    REFERENCES nguoi_dung(ma_nguoi_dung) ON DELETE SET NULL,
+  CONSTRAINT fk_tthd_nguoi_tao FOREIGN KEY (nguoi_tao)
+    REFERENCES nguoi_dung(ma_nguoi_dung) ON DELETE SET NULL,
+  CONSTRAINT fk_tthd_nguoi_xac_nhan FOREIGN KEY (nguoi_xac_nhan)
+    REFERENCES nguoi_dung(ma_nguoi_dung) ON DELETE SET NULL,
+  CONSTRAINT chk_tthd_so_tien CHECK (so_tien > 0),
+  CONSTRAINT chk_tthd_trang_thai CHECK (trang_thai IN ('ChoXacNhan', 'DaXacNhan', 'TuChoi'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------
+-- 13. Danh gia
 -- ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS danh_gia (
   ma_danh_gia     INT AUTO_INCREMENT PRIMARY KEY,
@@ -213,6 +292,7 @@ CREATE TABLE IF NOT EXISTS danh_gia (
   ma_phong        INT NOT NULL,
   so_sao          INT NOT NULL,
   noi_dung        TEXT NULL,
+  trang_thai      VARCHAR(20) NOT NULL DEFAULT 'HienThi',
   ngay_tao        DATETIME DEFAULT CURRENT_TIMESTAMP,
   ngay_cap_nhat   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_dg_nguoi_dung FOREIGN KEY (ma_nguoi_dung)
@@ -235,6 +315,25 @@ CREATE TABLE IF NOT EXISTS thong_bao (
   ngay_tao        DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_tb_nguoi_dung FOREIGN KEY (ma_nguoi_dung)
     REFERENCES nguoi_dung(ma_nguoi_dung) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------
+-- 13. Yeu cau ho tro
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS yeu_cau_ho_tro (
+  ma_yeu_cau       INT AUTO_INCREMENT PRIMARY KEY,
+  ma_nguoi_dung    VARCHAR(128) NOT NULL,
+  tieu_de          VARCHAR(200) NOT NULL,
+  noi_dung         TEXT NOT NULL,
+  trang_thai       VARCHAR(20) NOT NULL DEFAULT 'Moi',
+  phan_hoi_admin   TEXT NULL,
+  nguoi_xu_ly      VARCHAR(128) NULL,
+  ngay_tao         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  ngay_cap_nhat    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ho_tro_nguoi_gui FOREIGN KEY (ma_nguoi_dung)
+    REFERENCES nguoi_dung(ma_nguoi_dung) ON DELETE CASCADE,
+  CONSTRAINT fk_ho_tro_nguoi_xu_ly FOREIGN KEY (nguoi_xu_ly)
+    REFERENCES nguoi_dung(ma_nguoi_dung) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------
@@ -262,9 +361,13 @@ CREATE INDEX idx_phong_tro_gia_thue       ON phong_tro(gia_thue);
 CREATE INDEX idx_anh_phong_phong          ON anh_phong(ma_phong);
 CREATE INDEX idx_dat_phong_nguoi_thue     ON dat_phong(ma_nguoi_thue);
 CREATE INDEX idx_dat_phong_phong          ON dat_phong(ma_phong);
+CREATE INDEX idx_dat_lich_nguoi_thue      ON dat_lich_xem(ma_nguoi_thue);
+CREATE INDEX idx_dat_lich_phong_thoi_gian ON dat_lich_xem(ma_phong, thoi_gian_hen);
 CREATE INDEX idx_hop_dong_nguoi_thue      ON hop_dong(ma_nguoi_thue);
 CREATE INDEX idx_hop_dong_phong           ON hop_dong(ma_phong);
 CREATE INDEX idx_thanh_toan_hop_dong      ON thanh_toan(ma_hop_dong);
+CREATE INDEX idx_hoa_don_ky_han            ON hoa_don(ky_thanh_toan, han_thanh_toan);
+CREATE INDEX idx_tthd_hoa_don_trang_thai   ON thanh_toan_hoa_don(ma_hoa_don, trang_thai);
 CREATE INDEX idx_danh_gia_phong           ON danh_gia(ma_phong);
 CREATE INDEX idx_thong_bao_nguoi_dung     ON thong_bao(ma_nguoi_dung, da_doc);
 CREATE INDEX idx_ho_so_phap_ly_phong      ON ho_so_phap_ly(ma_phong);

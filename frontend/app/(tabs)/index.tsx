@@ -1,20 +1,22 @@
+import { formatNumber } from '@/utils/format';
+import { useFavorites } from '@/hooks/use-favorites';
+import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
+import { styles } from '@/styles/home.styles';
+import { router } from 'expo-router';
+import { onAuthStateChanged } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  ActivityIndicator,
-  useWindowDimensions,
-  Platform,
+    ActivityIndicator,
+    Image,
+    Platform,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
-import { router } from 'expo-router';
-import { firebaseAuth } from '@/services/firebase';
-import { backendApi } from '@/services/backend';
-import { onAuthStateChanged } from 'firebase/auth';
-import { styles } from '@/styles/home.styles';
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -30,6 +32,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState<any[]>([]);
   const [networkError, setNetworkError] = useState(false);
+  const { favoriteIds, toggleFavorite } = useFavorites();
 
   useEffect(() => {
     loadRooms(); // Luôn tải phòng, không cần đăng nhập
@@ -72,7 +75,7 @@ export default function HomeScreen() {
 
         // Chủ trọ → vào landlord portal
         if (role === 'ChuTro') {
-          router.replace('/(landlord)' as any);
+          router.replace('/(landlord)/phong-tro' as any);
           return;
         }
       }
@@ -324,10 +327,14 @@ export default function HomeScreen() {
                         e.stopPropagation();
                         if (!isLoggedIn) {
                           router.push('/login');
+                        } else {
+                          void toggleFavorite(room.ma_phong);
                         }
                       }}
                     >
-                      <Text style={styles.heartText}>♡</Text>
+                      <Text style={[styles.heartText, favoriteIds.has(Number(room.ma_phong)) && { color: '#DC2626' }]}>
+                        {favoriteIds.has(Number(room.ma_phong)) ? '♥' : '♡'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
@@ -341,7 +348,7 @@ export default function HomeScreen() {
                     </Text>
                     <View style={styles.roomBottom}>
                       <Text style={styles.price}>
-                        {room.gia_thue?.toLocaleString('vi-VN')} đ/tháng
+                        {formatNumber(room.gia_thue)} đ/tháng
                       </Text>
                       <Text style={styles.area}>
                         {room.dien_tich ? `${room.dien_tich} m²` : '--'}
@@ -387,7 +394,7 @@ export default function HomeScreen() {
                   </Text>
                   <View style={styles.newBottom}>
                     <Text style={styles.newPrice}>
-                      {room.gia_thue?.toLocaleString('vi-VN')} đ/tháng
+                      {formatNumber(room.gia_thue)} đ/tháng
                     </Text>
                     <Text style={styles.newArea}>
                       {room.dien_tich ? `${room.dien_tich} m²` : '--'}

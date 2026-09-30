@@ -1,16 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  useWindowDimensions,
-} from 'react-native';
+import Pagination, { ADMIN_PAGE_SIZE } from '@/components/admin/Pagination';
+import { backendApi } from '@/services/backend';
 import { styles } from '@/styles/admin/rooms-management.styles';
 import { TienIch } from '@/types/room';
-import { backendApi } from '@/services/backend';
 import { showAlert } from '@/utils/alert';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from 'react-native';
 import TienIchFormModal from './TienIchFormModal';
 
 export default function TienIchManagement() {
@@ -25,6 +26,11 @@ export default function TienIchManagement() {
   const [editingTienIch, setEditingTienIch] = useState<TienIch | null>(null);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const paginatedTienIchs = tienIchs.slice(
+    (currentPage - 1) * ADMIN_PAGE_SIZE,
+    currentPage * ADMIN_PAGE_SIZE
+  );
 
   // We can force cards on mobile, table on desktop, or let user toggle
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(isMobile ? 'cards' : 'table');
@@ -104,7 +110,7 @@ export default function TienIchManagement() {
               <Text style={{ color: '#888' }}>Không có tiện ích nào.</Text>
             </View>
           ) : (
-            tienIchs.map((t) => (
+            paginatedTienIchs.map((t) => (
               <View key={t.ma_tien_ich} style={styles.tableRow}>
                 <View style={[styles.cell, { width: 80 }]}>
                   <Text style={{ fontSize: 13, color: '#555' }}>#{t.ma_tien_ich}</Text>
@@ -146,7 +152,7 @@ export default function TienIchManagement() {
           <Text style={{ color: '#888' }}>Không tìm thấy tiện ích nào.</Text>
         </View>
       ) : (
-        tienIchs.map((t) => (
+        paginatedTienIchs.map((t) => (
           <View key={t.ma_tien_ich} style={styles.mobileRoomCard}>
             <View style={styles.mobileCardHeader}>
               <View style={styles.mobileCardInfo}>
@@ -215,6 +221,12 @@ export default function TienIchManagement() {
           {viewMode === 'table' ? renderTable() : renderCards()}
         </ScrollView>
       )}
+
+      <Pagination
+        currentPage={currentPage}
+        totalItems={tienIchs.length}
+        onPageChange={setCurrentPage}
+      />
 
       <TienIchFormModal
         visible={modalVisible}

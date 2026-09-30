@@ -2,15 +2,15 @@ import { backendApi } from '@/services/backend';
 import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/admin/admin.styles';
 import { Slot, router, usePathname } from 'expo-router';
-import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-  useWindowDimensions,
+    ActivityIndicator,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
+    useWindowDimensions,
 } from 'react-native';
 
 export default function LandlordLayout() {
@@ -23,14 +23,23 @@ export default function LandlordLayout() {
 
   // Xác định tab đang chọn dựa trên pathname
   const isKhuTro = pathname.includes('khu-tro');
-  const isDatPhong = pathname.includes('dat-phong') || pathname.includes('dat-lich');
-  const isRooms = !isKhuTro && !isDatPhong;
+  const isDatPhong = pathname.includes('dat-phong');
+  const isDatLich = pathname.includes('dat-lich');
+  const isNotifications = pathname.includes('thong-bao');
+  const isContracts = pathname.includes('hop-dong');
+  const isRooms = !isKhuTro && !isDatPhong && !isDatLich && !isNotifications && !isContracts;
 
   let pageTitle = 'Quản lý phòng trọ';
   if (isKhuTro) {
     pageTitle = 'Quản lý khu trọ';
   } else if (isDatPhong) {
     pageTitle = 'Yêu cầu đặt phòng';
+  } else if (isDatLich) {
+    pageTitle = 'Lịch xem phòng';
+  } else if (isNotifications) {
+    pageTitle = 'Thông báo';
+  } else if (isContracts) {
+    pageTitle = 'Hợp đồng & Thanh toán';
   }
 
   // Cập nhật title trình duyệt khi chạy trên Web
@@ -40,10 +49,16 @@ export default function LandlordLayout() {
       document.title = 'Khu trọ | Chủ trọ';
     } else if (isDatPhong) {
       document.title = 'Yêu cầu đặt phòng | Chủ trọ';
+    } else if (isDatLich) {
+      document.title = 'Lịch xem phòng | Chủ trọ';
+    } else if (isNotifications) {
+      document.title = 'Thông báo | Chủ trọ';
+    } else if (isContracts) {
+      document.title = 'Hợp đồng & Thanh toán | Chủ trọ';
     } else {
       document.title = 'Quản lý phòng trọ | Chủ trọ';
     }
-  }, [pathname, isKhuTro, isDatPhong]);
+  }, [pathname, isKhuTro, isDatPhong, isDatLich, isNotifications, isContracts]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
@@ -124,6 +139,10 @@ export default function LandlordLayout() {
               <Text style={styles.backHomeButtonText}>Trang chủ</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity style={styles.backHomeButton} onPress={() => router.push('/(landlord)/thong-bao' as any)}>
+              <Text style={styles.backHomeButtonText}>Thông báo</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.backHomeButton, { borderColor: '#FCA5A5' }]}
               onPress={handleLogout}
@@ -145,7 +164,7 @@ export default function LandlordLayout() {
                 styles.mobileNavChip,
                 isRooms && styles.mobileNavChipActive,
               ]}
-              onPress={() => router.push('/(landlord)' as any)}
+              onPress={() => router.push('/(landlord)/phong-tro' as any)}
             >
               <Text
                 style={[
@@ -155,6 +174,13 @@ export default function LandlordLayout() {
               >
                 🏠 Phòng trọ
               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.mobileNavChip, isDatLich && styles.mobileNavChipActive]}
+              onPress={() => router.push('/(landlord)/dat-lich' as any)}
+            >
+              <Text style={[styles.mobileNavChipText, isDatLich && styles.mobileNavChipTextActive]}>📅 Lịch xem phòng</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -190,6 +216,23 @@ export default function LandlordLayout() {
                 📋 Đặt phòng
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.mobileNavChip,
+                isContracts && styles.mobileNavChipActive,
+              ]}
+              onPress={() => router.push('/(landlord)/hop-dong' as any)}
+            >
+              <Text
+                style={[
+                  styles.mobileNavChipText,
+                  isContracts && styles.mobileNavChipTextActive,
+                ]}
+              >
+                Hợp đồng & Thanh toán
+              </Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
 
@@ -217,7 +260,7 @@ export default function LandlordLayout() {
             styles.menuItem,
             isRooms && styles.menuItemActive,
           ]}
-          onPress={() => router.push('/(landlord)' as any)}
+          onPress={() => router.push('/(landlord)/phong-tro' as any)}
         >
           <Text
             style={[
@@ -226,6 +269,38 @@ export default function LandlordLayout() {
             ]}
           >
             Quản lý phòng trọ
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.menuItem, isNotifications && styles.menuItemActive]}
+          onPress={() => router.push('/(landlord)/thong-bao' as any)}
+        >
+          <Text style={[styles.menuText, isNotifications && styles.menuTextActive]}>Thông báo</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.menuItem, isDatLich && styles.menuItemActive]}
+          onPress={() => router.push('/(landlord)/dat-lich' as any)}
+        >
+          <Text style={[styles.menuText, isDatLich && styles.menuTextActive]}>Lịch xem phòng</Text>
+        </TouchableOpacity>
+
+        {/* HỢP ĐỒNG & THANH TOÁN */}
+        <TouchableOpacity
+          style={[
+            styles.menuItem,
+            isContracts && styles.menuItemActive,
+          ]}
+          onPress={() => router.push('/(landlord)/hop-dong' as any)}
+        >
+          <Text
+            style={[
+              styles.menuText,
+              isContracts && styles.menuTextActive,
+            ]}
+          >
+            Hợp đồng & Thanh toán
           </Text>
         </TouchableOpacity>
 

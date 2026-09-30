@@ -1,19 +1,20 @@
+import { formatNumber } from '@/utils/format';
 // Màn hình Quản lý Yêu cầu Đặt phòng của Chủ Trọ (Bảng dat_phong)
-import React, { useEffect, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-  useWindowDimensions,
-  StyleSheet,
-  Linking,
-  Platform,
-  Alert,
-} from 'react-native';
-import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Linking,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from 'react-native';
 
 export default function LandlordDatPhongScreen() {
   const { width } = useWindowDimensions();
@@ -41,6 +42,9 @@ export default function LandlordDatPhongScreen() {
       setBookings(res.data || []);
     } catch (e) {
       console.log('LOAD BOOKINGS ERROR:', e);
+      const message = (e as any)?.response?.data?.error || 'Không thể tải yêu cầu đặt phòng.';
+      if (Platform.OS === 'web') alert(message);
+      else Alert.alert('Lỗi', message);
     } finally {
       setLoading(false);
     }
@@ -49,6 +53,7 @@ export default function LandlordDatPhongScreen() {
   // Cập nhật trạng thái duyệt/từ chối đặt phòng
   const handleUpdateStatus = async (id: any, newStatus: string) => {
     try {
+      await backendApi.put(`/api/dat-phong/${id}/status`, { trang_thai: newStatus });
       setBookings((prev) =>
         prev.map((b) =>
           b.ma_dat_phong === id || b.ma_dat_lich === id
@@ -57,14 +62,15 @@ export default function LandlordDatPhongScreen() {
         )
       );
 
-      await backendApi.put(`/api/dat-phong/${id}/status`, { trang_thai: newStatus });
-
       const statusText = newStatus === 'DaDuyet' ? 'Chấp nhận' : 'Từ chối';
       const msg = `Đã ${statusText} yêu cầu đặt phòng!`;
       if (Platform.OS === 'web') alert(msg);
       else Alert.alert('Thành công', msg);
     } catch (e) {
       console.log('UPDATE STATUS ERROR:', e);
+      const message = (e as any)?.response?.data?.error || 'Không thể cập nhật yêu cầu đặt phòng.';
+      if (Platform.OS === 'web') alert(message);
+      else Alert.alert('Lỗi', message);
     }
   };
 
@@ -191,7 +197,7 @@ export default function LandlordDatPhongScreen() {
 
                   {b.phong_tro?.gia_thue && (
                     <Text style={styles.priceText}>
-                      💵 Giá thuê: <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>{Number(b.phong_tro.gia_thue).toLocaleString('vi-VN')} đ/tháng</Text>
+                      💵 Giá thuê: <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>{formatNumber(b.phong_tro.gia_thue)} đ/tháng</Text>
                     </Text>
                   )}
 

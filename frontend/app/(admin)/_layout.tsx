@@ -8,7 +8,6 @@ export default function AdminLayout() {
       }}
     >
       <Stack.Screen name="admin" />
-      <Stack.Screen name="admin-users" />
     </Stack>
   );
 }

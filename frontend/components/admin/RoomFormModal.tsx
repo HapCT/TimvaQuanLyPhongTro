@@ -1,22 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  ActivityIndicator,
+    ActivityIndicator,
+    Image,
+    Modal,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
-import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
-import { KhuTro, TienIch, RoomStatus, AnhPhong, RoomWithDetails } from '@/types';
 import { styles } from '@/styles/admin/room-form.styles';
+import { KhuTro, RoomStatus, RoomWithDetails, TienIch } from '@/types';
 import { showAlert } from '@/utils/alert';
-import * as ImagePicker from 'expo-image-picker';
 import { uploadImageToSupabase } from '@/utils/upload';
+import * as ImagePicker from 'expo-image-picker';
 
 const STATUS_OPTIONS: { key: RoomStatus; label: string }[] = [
   { key: 'ConTrong', label: 'Còn trống' },
@@ -80,7 +79,7 @@ export default function RoomFormModal({
       setTienCoc(editingRoom.tien_coc != null ? String(editingRoom.tien_coc) : '');
       setTang(editingRoom.tang != null ? String(editingRoom.tang) : '');
       setSoNguoiToiDa(editingRoom.so_nguoi_toi_da != null ? String(editingRoom.so_nguoi_toi_da) : '');
-      setTrangThai(editingRoom.trang_thai || 'Trong');
+      setTrangThai(editingRoom.trang_thai || 'ConTrong');
       setSelectedTienIch(new Set(editingRoom.danh_sach_tien_ich.map((t) => t.ma_tien_ich)));
       setImages(
         editingRoom.danh_sach_anh.map((a) => ({
@@ -99,7 +98,7 @@ export default function RoomFormModal({
       setTienCoc('');
       setTang('');
       setSoNguoiToiDa('');
-      setTrangThai('Trong');
+      setTrangThai('ConTrong');
       setSelectedTienIch(new Set());
       setImages([]);
     }

@@ -1,20 +1,23 @@
+import { formatNumber } from '@/utils/format';
 // Màn hình Tìm kiếm / Khám phá phòng trọ - Đã nâng cấp giao diện đẹp mắt, chuẩn tỉ lệ không méo hình
-import React, { useEffect, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  ActivityIndicator,
-  StyleSheet,
-  useWindowDimensions,
-  Platform,
-} from 'react-native';
-import { router } from 'expo-router';
+import { useFavorites } from '@/hooks/use-favorites';
 import { backendApi } from '@/services/backend';
 import { firebaseAuth } from '@/services/firebase';
+import { router } from 'expo-router';
+import { onAuthStateChanged } from 'firebase/auth';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from 'react-native';
 
 const PRICE_FILTERS = [
   { label: 'Tất cả mức giá', min: 0, max: Infinity },
@@ -46,20 +49,13 @@ export default function ExploreScreen() {
   const [selectedKhuTro, setSelectedKhuTro] = useState(''); // ma_khu_tro hoặc '' = tất cả
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'ConTrong' | 'DaThue'>('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
+  const { favoriteIds, toggleFavorite } = useFavorites();
 
   useEffect(() => {
-    checkUser();
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => setIsLoggedIn(!!user));
     loadData();
+    return () => unsubscribe();
   }, []);
-
-  const checkUser = async () => {
-    try {
-      const user = firebaseAuth.currentUser;
-      setIsLoggedIn(!!user);
-    } catch (e) {
-      setIsLoggedIn(false);
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -362,10 +358,14 @@ export default function ExploreScreen() {
                         e.stopPropagation();
                         if (!isLoggedIn) {
                           router.push('/login');
+                        } else {
+                          void toggleFavorite(room.ma_phong);
                         }
                       }}
                     >
-                      <Text style={styles.heartText}>♡</Text>
+                      <Text style={[styles.heartText, favoriteIds.has(Number(room.ma_phong)) && { color: '#DC2626' }]}>
+                        {favoriteIds.has(Number(room.ma_phong)) ? '♥' : '♡'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
@@ -403,7 +403,7 @@ export default function ExploreScreen() {
                     {/* GIÁ THUÊ VÀ DIỆN TÍCH */}
                     <View style={styles.roomBottom}>
                       <Text style={styles.price}>
-                        {room.gia_thue?.toLocaleString('vi-VN')} đ/tháng
+                        {formatNumber(room.gia_thue)} đ/tháng
                       </Text>
                       <Text style={styles.area}>
                         {room.dien_tich ? `${room.dien_tich} m²` : '--'}

@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const datPhongController = require('../controllers/datPhongController');
-const { optionalAuth } = require('../middleware/auth');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
-router.get('/', optionalAuth, datPhongController.getAll);
-router.post('/', optionalAuth, datPhongController.create);
-router.put('/:id/status', optionalAuth, datPhongController.updateStatus);
+router.get('/', requireAuth, datPhongController.getAll);
+router.post('/', requireRole('NguoiThue'), datPhongController.create);
+router.put('/:id/status', requireRole('ChuTro', 'QuanTri'), datPhongController.updateStatus);
 
 module.exports = router;

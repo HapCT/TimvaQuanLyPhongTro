@@ -1,21 +1,23 @@
+import { formatNumber } from '@/utils/format';
+import Pagination, { ADMIN_PAGE_SIZE } from '@/components/admin/Pagination';
+import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
+import { styles } from '@/styles/admin/rooms-management.styles';
+import { showAlert } from '@/utils/alert';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Image,
-  TextInput,
-  Modal,
-  Linking,
-  Platform,
-  Alert,
-  useWindowDimensions,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View
 } from 'react-native';
-import { backendApi } from '@/services/backend';
-import { showAlert } from '@/utils/alert';
-import { styles } from '@/styles/admin/rooms-management.styles';
 
 export default function RoomReviewManagement() {
   const { width } = useWindowDimensions();
@@ -25,6 +27,7 @@ export default function RoomReviewManagement() {
   const [counts, setCounts] = useState({ ChoDuyet: 0, DaDuyet: 0, TuChoi: 0 });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'ChoDuyet' | 'DaDuyet' | 'TuChoi' | 'ALL'>('ChoDuyet');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [processingId, setProcessingId] = useState<number | null>(null);
@@ -41,7 +44,21 @@ export default function RoomReviewManagement() {
     loadReviewRooms();
   }, [activeTab]);
 
+  const paginatedRooms = rooms.slice(
+    (currentPage - 1) * ADMIN_PAGE_SIZE,
+    currentPage * ADMIN_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+
   const loadReviewRooms = async () => {
+    // Đã đăng xuất (không còn token) thì không gọi API
+    if (!firebaseAuth.currentUser) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const res = await backendApi.get(`/api/phong-tro/admin/review?status=${activeTab}`);
@@ -51,7 +68,11 @@ export default function RoomReviewManagement() {
       }
     } catch (e: any) {
       console.log('LOAD REVIEW ERROR:', e);
-      showAlert('Lỗi', 'Không thể tải danh sách bài đăng duyệt.');
+      console.log('LOAD REVIEW ERROR:', e.response?.status, e.response?.data);
+      // 401 = token hết hạn / vừa đăng xuất: không cần hiện lỗi
+      if (e.response?.status !== 401) {
+        showAlert('Lỗi', 'Không thể tải danh sách bài đăng duyệt.');
+      }
     } finally {
       setLoading(false);
     }
@@ -208,7 +229,7 @@ export default function RoomReviewManagement() {
         </View>
       ) : (
         <View style={{ gap: 12 }}>
-          {rooms.map((room) => {
+          {paginatedRooms.map((room) => {
             const isExpanded = expandedIds.has(room.ma_phong);
             const anhDaiDien = room.danh_sach_anh?.[0]?.duong_dan_anh || room.anh_dai_dien;
 
@@ -242,7 +263,7 @@ export default function RoomReviewManagement() {
                         📍 {room.khu_tro?.ten_khu_tro} - {room.khu_tro?.dia_chi}
                       </Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: '#2563EB' }}>
-                        💰 {(room.gia_thue || 0).toLocaleString('vi-VN')} đ/tháng | Coc: {(room.tien_coc || 0).toLocaleString('vi-VN')} đ
+                        💰 {formatNumber(room.gia_thue || 0)} đ/tháng | Coc: {formatNumber(room.tien_coc || 0)} đ
                       </Text>
                     </View>
                   </View>
@@ -381,6 +402,12 @@ export default function RoomReviewManagement() {
           })}
         </View>
       )}
+
+      <Pagination
+        currentPage={currentPage}
+        totalItems={rooms.length}
+        onPageChange={setCurrentPage}
+      />
 
       {/* MODAL TỪ CHỐI BÀI ĐĂNG */}
       <Modal visible={rejectModalVisible} transparent animationType="fade">

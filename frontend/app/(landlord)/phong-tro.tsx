@@ -1,24 +1,25 @@
+import { formatNumber } from '@/utils/format';
 // Trang quản lý phòng trọ dành riêng cho Chủ Trọ
-import React, { useEffect, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  ScrollView,
-  Image,
-  useWindowDimensions,
-  StyleSheet,
-  Modal,
-  Platform,
-  Alert,
-} from 'react-native';
-import { firebaseAuth } from '@/services/firebase';
 import { backendApi } from '@/services/backend';
-import { onAuthStateChanged } from 'firebase/auth';
-import * as ImagePicker from 'expo-image-picker';
+import { firebaseAuth } from '@/services/firebase';
 import { uploadImage } from '@/utils/upload';
+import * as ImagePicker from 'expo-image-picker';
+import { onAuthStateChanged } from 'firebase/auth';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from 'react-native';
 
 export default function LandlordRoomsScreen() {
   const { width } = useWindowDimensions();
@@ -68,6 +69,9 @@ export default function LandlordRoomsScreen() {
   const [formAnhDaiDien, setFormAnhDaiDien] = useState('');
   const [formMoTa, setFormMoTa] = useState('');
   const [selectedTienIch, setSelectedTienIch] = useState<string[]>([]);
+  const [showAddTienIch, setShowAddTienIch] = useState(false);
+  const [newTienIchName, setNewTienIchName] = useState('');
+  const [addingTienIch, setAddingTienIch] = useState(false);
 
   // State Ảnh phòng & Hồ sơ pháp lý
   const [roomImages, setRoomImages] = useState<string[]>([]);
@@ -193,6 +197,16 @@ export default function LandlordRoomsScreen() {
     }
   };
 
+  const getRoomName = (r: any) =>
+    r.tieu_de || (r.so_phong ? `Phòng ${r.so_phong}` : `Phòng #${r.ma_phong}`);
+
+  // Thông báo: các phòng bị Admin từ chối duyệt
+  const rejectedRooms = useMemo(
+    () => myRooms.filter((r) => r.trang_thai_duyet === 'TuChoi'),
+    [myRooms]
+  );
+  const [hideRejectedBanner, setHideRejectedBanner] = useState(false);
+
   // Thống kê nhanh
   const stats = useMemo(() => {
     const total = myRooms.length;
@@ -316,6 +330,36 @@ export default function LandlordRoomsScreen() {
   };
 
   // Lưu thông tin phòng trọ
+  // Chủ trọ tự thêm tiện ích mới rồi tự động chọn luôn cho phòng đang soạn
+  const handleAddTienIch = async () => {
+    const ten = newTienIchName.trim();
+    if (!ten) {
+      const msg = 'Vui lòng nhập tên tiện ích.';
+      if (Platform.OS === 'web') alert(msg); else Alert.alert('Lỗi', msg);
+      return;
+    }
+    try {
+      setAddingTienIch(true);
+      const res = await backendApi.post('/api/tien-ich', { ten_tien_ich: ten });
+      const created = res.data?.data;
+      if (created) {
+        setTienIchList((prev) =>
+          prev.some((t) => t.ma_tien_ich === created.ma_tien_ich) ? prev : [...prev, created]
+        );
+        setSelectedTienIch((prev) =>
+          prev.includes(created.ma_tien_ich) ? prev : [...prev, created.ma_tien_ich]
+        );
+      }
+      setNewTienIchName('');
+      setShowAddTienIch(false);
+    } catch (e: any) {
+      const msg = e.response?.data?.error || 'Không thể thêm tiện ích lúc này.';
+      if (Platform.OS === 'web') alert(msg); else Alert.alert('Lỗi', msg);
+    } finally {
+      setAddingTienIch(false);
+    }
+  };
+
   const handleSaveRoom = async () => {
     if (!formSoPhong.trim() || !formGiaThue.trim() || !formMaKhuTro) {
       const msg = 'Vui lòng điền Số phòng, Giá thuê và Chọn khu trọ.';
@@ -415,6 +459,27 @@ export default function LandlordRoomsScreen() {
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
       <View style={[styles.mainContent, { maxWidth: isDesktop ? 1250 : '100%' }]}>
+
+        {/* THÔNG BÁO PHÒNG BỊ TỪ CHỐI */}
+        {rejectedRooms.length > 0 && !hideRejectedBanner && (
+          <View style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 12, padding: 14, marginBottom: 14, gap: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ color: '#B91C1C', fontWeight: 'bold', fontSize: 14, flex: 1 }}>
+                🔔 {rejectedRooms.length} bài đăng bị Admin từ chối
+              </Text>
+              <TouchableOpacity onPress={() => setHideRejectedBanner(true)}>
+                <Text style={{ color: '#999', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {rejectedRooms.map((r) => (
+              <TouchableOpacity key={r.ma_phong} onPress={() => handleOpenForm(r)}>
+                <Text style={{ color: '#7F1D1D', fontSize: 13 }}>
+                  • <Text style={{ fontWeight: 'bold' }}>{getRoomName(r)}</Text>: {r.ly_do_tu_choi || 'Không có lý do'} (bấm để sửa & gửi lại)
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* THỐNG KÊ NHANH */}
         <View style={styles.statsRow}>
@@ -530,14 +595,31 @@ export default function LandlordRoomsScreen() {
 
                   <View style={styles.roomBody}>
                     <Text style={styles.roomTitle} numberOfLines={1}>
-                      {room.tieu_de || `Phòng ${room.so_phong}`}
+                      {getRoomName(room)}
                     </Text>
                     <Text style={styles.roomKhuText} numberOfLines={1}>
-                      🏢 {room.khu_tro?.ten_khu_tro || 'Khu trọ'} - Số phòng: {room.so_phong}
+                      🏢 {room.khu_tro?.ten_khu_tro || 'Khu trọ'} - Số phòng: {room.so_phong || '--'}
                     </Text>
 
+                    {/* TRẠNG THÁI DUYỆT */}
+                    {room.trang_thai_duyet === 'ChoDuyet' && (
+                      <Text style={{ marginTop: 6, fontSize: 12, fontWeight: '700', color: '#B45309' }}>⏳ Đang chờ Admin duyệt</Text>
+                    )}
+                    {room.trang_thai_duyet === 'DaDuyet' && (
+                      <Text style={{ marginTop: 6, fontSize: 12, fontWeight: '700', color: '#15803D' }}>✅ Đã được duyệt</Text>
+                    )}
+                    {room.trang_thai_duyet === 'TuChoi' && (
+                      <View style={{ marginTop: 8, backgroundColor: '#FEF2F2', borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#B91C1C' }}>❌ Bị từ chối</Text>
+                        <Text style={{ fontSize: 12, color: '#7F1D1D', marginTop: 2 }}>
+                          Lý do: {room.ly_do_tu_choi || 'Không có lý do'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>Sửa lại thông tin rồi lưu để gửi duyệt lại.</Text>
+                      </View>
+                    )}
+
                     <View style={styles.priceRow}>
-                      <Text style={styles.priceVal}>{room.gia_thue?.toLocaleString('vi-VN')} đ/tháng</Text>
+                      <Text style={styles.priceVal}>{formatNumber(room.gia_thue)} đ/tháng</Text>
                       <Text style={styles.areaVal}>{room.dien_tich ? `${room.dien_tich} m²` : '--'}</Text>
                     </View>
 
@@ -724,7 +806,7 @@ export default function LandlordRoomsScreen() {
                     paddingHorizontal: 16,
                     borderRadius: 8,
                     flexDirection: 'row',
-                    justify: 'center',
+                    justifyContent: 'center',
                     alignItems: 'center',
                     gap: 8,
                   }}
@@ -807,7 +889,56 @@ export default function LandlordRoomsScreen() {
                       </TouchableOpacity>
                     );
                   })}
+
+                  {!showAddTienIch && (
+                    <TouchableOpacity
+                      style={{
+                        paddingVertical: 6,
+                        paddingHorizontal: 12,
+                        borderRadius: 20,
+                        borderWidth: 1.5,
+                        borderStyle: 'dashed',
+                        borderColor: '#007AFF',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                      onPress={() => setShowAddTienIch(true)}
+                    >
+                      <Text style={{ fontSize: 13, color: '#007AFF', fontWeight: '700' }}>+ Thêm tiện ích</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
+
+                {showAddTienIch && (
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      placeholder="VD: Máy giặt, Ban công, Thang máy..."
+                      placeholderTextColor="#999"
+                      value={newTienIchName}
+                      onChangeText={setNewTienIchName}
+                      maxLength={100}
+                      autoFocus
+                      onSubmitEditing={handleAddTienIch}
+                    />
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#007AFF', paddingHorizontal: 14, height: 42, borderRadius: 10, justifyContent: 'center' }}
+                      onPress={handleAddTienIch}
+                      disabled={addingTienIch}
+                    >
+                      {addingTienIch ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Thêm</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 10, height: 42, justifyContent: 'center' }}
+                      onPress={() => { setShowAddTienIch(false); setNewTienIchName(''); }}
+                    >
+                      <Text style={{ color: '#666', fontWeight: '600', fontSize: 13 }}>Hủy</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               <Text style={[styles.label, { marginTop: 14 }]}>Mô tả phòng trọ</Text>
@@ -1004,11 +1135,11 @@ export default function LandlordRoomsScreen() {
                 <Text style={{ fontSize: 13, color: '#3730A3', lineHeight: 20 }}>
                   Mỗi bài đăng phòng trọ mới sẽ được thu phí{' '}
                   <Text style={{ fontWeight: 'bold', color: '#1D4ED8' }}>
-                    {PHI_DANG_BAI.toLocaleString('vi-VN')} đồng
+                    {formatNumber(PHI_DANG_BAI)} đồng
                   </Text>{' '}
                   để duy trì hệ thống và ngăn chặn đăng tin lừa đảo.
                   {'\n'}
-                  Khi phòng chuyển sang trạng thái "Đã thuê", bài sẽ tự động ẩn và
+                  Khi phòng chuyển sang trạng thái &quot;Đã thuê&quot;, bài sẽ tự động ẩn và
                   <Text style={{ fontWeight: 'bold' }}> không thu phí thêm</Text>.
                   Khi đăng lại (chuyển về Còn trống) sẽ tính phí mới.
                 </Text>
@@ -1037,7 +1168,7 @@ export default function LandlordRoomsScreen() {
                   </View>
                   <Text style={{ fontSize: 13, color: '#1E40AF', fontWeight: '600', flex: 1 }}>
                     Tôi đồng ý thanh toán phí đăng bài{' '}
-                    {PHI_DANG_BAI.toLocaleString('vi-VN')} đ (demo – chưa tích hợp cổng thanh toán)
+                    {formatNumber(PHI_DANG_BAI)} đ (demo – chưa tích hợp cổng thanh toán)
                   </Text>
                 </TouchableOpacity>
               </View>

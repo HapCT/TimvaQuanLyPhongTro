@@ -1,6 +1,14 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
+import { getAuth, initializeAuth } from 'firebase/auth';
 import { Platform } from 'react-native';
+
+import * as authModule from 'firebase/auth';
+const getReactNativePersistence = (
+  authModule as typeof authModule & {
+    getReactNativePersistence: (storage: unknown) => import('firebase/auth').Persistence;
+  }
+).getReactNativePersistence;
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -23,7 +31,6 @@ if (Platform.OS === 'web') {
   firebaseAuth = getAuth(app);
 } else {
   // Trên mobile (Android/iOS) dùng AsyncStorage để persist session
-  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
   firebaseAuth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });

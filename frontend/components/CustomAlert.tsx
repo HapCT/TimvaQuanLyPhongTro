@@ -1,12 +1,12 @@
-import React, { useState, useImperativeHandle, forwardRef, RefObject } from 'react';
+import React, { forwardRef, RefObject, useImperativeHandle, useState } from 'react';
 import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Platform,
+    Animated,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 export type AlertButton = {
@@ -195,5 +195,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+
+CustomAlert.displayName = 'CustomAlert';
 
 export default CustomAlert;

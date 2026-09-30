@@ -1,22 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-  useWindowDimensions,
-  Linking,
-  Modal,
-  TextInput,
-  Alert,
-  Platform,
-} from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useFavorites } from '@/hooks/use-favorites';
 import { backendApi } from '@/services/backend';
 import { firebaseAuth } from '@/services/firebase';
+import { formatNumber } from '@/utils/format';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 // Map icon gợi ý cho các tiện ích thông dụng
 const getAmenityIcon = (name: string) => {
@@ -47,6 +49,24 @@ export default function RoomDetailScreen() {
 
   // User state
   const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState('');
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewStars, setReviewStars] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const { favoriteIds, toggleFavorite } = useFavorites();
+  // Trạng thái yêu cầu thuê của người dùng với phòng này: '' | ChoDuyet | DaDuyet | TuChoi
+  const [myBookingStatus, setMyBookingStatus] = useState('');
+  const [hasReviewed, setHasReviewed] = useState(false);
+  // Đã đi xem phòng này (lịch hẹn DaXem) -> được phép đánh giá
+  const [hasViewed, setHasViewed] = useState(false);
+
+  // Modal Yêu cầu thuê phòng
+  const [rentModalVisible, setRentModalVisible] = useState(false);
+  const [rentDate, setRentDate] = useState('');
+  const [rentPeople, setRentPeople] = useState('1');
+  const [rentNote, setRentNote] = useState('');
+  const [rentSubmitting, setRentSubmitting] = useState(false);
 
   // Modal Đặt lịch xem phòng
   const [modalVisible, setModalVisible] = useState(false);
@@ -74,10 +94,89 @@ export default function RoomDetailScreen() {
         if (res.data) {
           setBookingName(res.data.ho_ten || '');
           setBookingPhone(res.data.so_dien_thoai || '');
+          const role = String(res.data.vai_tro || '').trim();
+          setUserRole(role);
+          if (role === 'NguoiThue') await loadMyStatusForRoom();
         }
       }
     } catch (e) {
       console.log('CHECK USER ERROR:', e);
+    }
+  };
+
+  // Xác định người dùng đã gửi yêu cầu thuê / đã đánh giá phòng này chưa
+  const loadMyStatusForRoom = async () => {
+    try {
+      const [bookingRes, reviewRes, appointmentRes] = await Promise.all([
+        backendApi.get('/api/dat-phong'),
+        backendApi.get('/api/danh-gia/mine'),
+        backendApi.get('/api/dat-lich'),
+      ]);
+      setHasViewed((appointmentRes.data || []).some(
+        (a: any) => String(a.ma_phong) === String(id) && a.trang_thai === 'DaXem'
+      ));
+      const mine = (bookingRes.data || []).filter((b: any) => String(b.ma_phong) === String(id));
+      const status = mine.some((b: any) => b.trang_thai === 'DaDuyet')
+        ? 'DaDuyet'
+        : mine.some((b: any) => b.trang_thai === 'ChoDuyet')
+          ? 'ChoDuyet'
+          : mine.length > 0 ? 'TuChoi' : '';
+      setMyBookingStatus(status);
+      setHasReviewed((reviewRes.data || []).some((r: any) => String(r.ma_phong) === String(id)));
+    } catch (e) {
+      console.log('LOAD MY ROOM STATUS ERROR:', e);
+    }
+  };
+
+  const notify = (title: string, message: string) => {
+    if (Platform.OS === 'web') alert(message);
+    else Alert.alert(title, message);
+  };
+
+  const handleOpenRentModal = () => {
+    if (!user) {
+      notify('Cần đăng nhập', 'Vui lòng đăng nhập để gửi yêu cầu thuê phòng.');
+      router.push('/login');
+      return;
+    }
+    if (userRole !== 'NguoiThue') {
+      notify('Không thể thuê', 'Chỉ tài khoản Người thuê mới gửi được yêu cầu thuê phòng.');
+      return;
+    }
+    if (!rentDate) {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      setRentDate(d.toISOString().split('T')[0]);
+    }
+    setRentModalVisible(true);
+  };
+
+  const handleSubmitRent = async () => {
+    const people = Number(rentPeople);
+    if (!Number.isInteger(people) || people < 1) {
+      notify('Thông báo', 'Số người thuê phải là số nguyên lớn hơn 0.');
+      return;
+    }
+    if (rentDate.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(rentDate.trim())) {
+      notify('Thông báo', 'Ngày dự kiến nhận phòng phải có dạng YYYY-MM-DD.');
+      return;
+    }
+    try {
+      setRentSubmitting(true);
+      await backendApi.post('/api/dat-phong', {
+        ma_phong: room.ma_phong,
+        ngay_du_kien_nhan_phong: rentDate.trim() || null,
+        so_nguoi: people,
+        ghi_chu: rentNote.trim() || null,
+      });
+      setRentModalVisible(false);
+      setRentNote('');
+      setMyBookingStatus('ChoDuyet');
+      notify('Thành công', 'Đã gửi yêu cầu thuê phòng. Bạn có thể theo dõi trong "Yêu cầu đặt phòng của tôi".');
+    } catch (e: any) {
+      notify('Lỗi', e?.response?.data?.error || 'Không thể gửi yêu cầu thuê phòng.');
+    } finally {
+      setRentSubmitting(false);
     }
   };
 
@@ -93,10 +192,58 @@ export default function RoomDetailScreen() {
         const found = (resAll.data?.rooms || []).find((r: any) => String(r.ma_phong) === String(id));
         setRoom(found || null);
       }
+      await loadReviews();
     } catch (error) {
       console.log('LOAD ROOM DETAIL ERROR:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadReviews = async () => {
+    try {
+      const response = await backendApi.get(`/api/danh-gia/phong/${id}`);
+      setReviews(response.data || []);
+    } catch (error) {
+      console.log('LOAD ROOM REVIEWS ERROR:', error);
+      setReviews([]);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    if (userRole !== 'NguoiThue') {
+      if (Platform.OS === 'web') alert('Chỉ người thuê mới có thể đánh giá phòng.');
+      else Alert.alert('Chưa thể đánh giá', 'Chỉ người thuê mới có thể đánh giá phòng.');
+      return;
+    }
+    if (!reviewText.trim()) {
+      if (Platform.OS === 'web') alert('Vui lòng nhập nội dung đánh giá.');
+      else Alert.alert('Thông báo', 'Vui lòng nhập nội dung đánh giá.');
+      return;
+    }
+
+    try {
+      setSubmittingReview(true);
+      await backendApi.post('/api/danh-gia', {
+        ma_phong: room.ma_phong,
+        so_sao: reviewStars,
+        noi_dung: reviewText.trim(),
+      });
+      setReviewText('');
+      setHasReviewed(true);
+      await loadReviews();
+      if (Platform.OS === 'web') alert('Đã gửi đánh giá.');
+      else Alert.alert('Thành công', 'Đã gửi đánh giá.');
+    } catch (error: any) {
+      const message = error?.response?.data?.error || 'Không thể gửi đánh giá.';
+      if (Platform.OS === 'web') alert(message);
+      else Alert.alert('Lỗi', message);
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -119,31 +266,42 @@ export default function RoomDetailScreen() {
   // Xác nhận gửi lịch hẹn xem phòng
   const handleSubmitBooking = async () => {
     if (!bookingName.trim() || !bookingPhone.trim() || !bookingDate.trim()) {
-      const msg = 'Vui lòng điền đầy đủ Họ tên, Số điện thoại và Ngày hẹn xem phòng!';
-      if (Platform.OS === 'web') alert(msg); else Alert.alert('Thông báo', msg);
+      if (Platform.OS === 'web') {
+        alert('Vui lòng điền đầy đủ Họ tên, Số điện thoại và Ngày hẹn xem phòng!');
+      } else {
+        Alert.alert('Thông báo', 'Vui lòng điền đầy đủ Họ tên, Số điện thoại và Ngày hẹn xem phòng!');
+      }
+      return;
+    }
+
+    if (!user) {
+      if (Platform.OS === 'web') alert('Vui lòng đăng nhập để gửi yêu cầu đặt phòng.');
+      else Alert.alert('Cần đăng nhập', 'Vui lòng đăng nhập để gửi yêu cầu đặt phòng.');
+      router.push('/login');
       return;
     }
 
     setSubmitting(true);
     try {
-      // Gửi đăng ký đặt phòng/xem phòng vào backend API (Bảng dat_phong)
-      await backendApi.post('/api/dat-phong', {
+      await backendApi.post('/api/dat-lich', {
         ma_phong: room.ma_phong,
-        ma_nguoi_thue: user ? user.id : null,
-        ho_ten: bookingName.trim(),
+        thoi_gian_hen: `${bookingDate.trim()} ${(bookingTime.trim() || '09:00').replace(/^(\d):/, '0$1:')}:00`,
         so_dien_thoai: bookingPhone.trim(),
-        ngay_du_kien_nhan_phong: bookingDate.trim(),
-        ghi_chu: `Khách: ${bookingName.trim()} | SĐT: ${bookingPhone.trim()}${bookingTime ? ` | Giờ hẹn: ${bookingTime.trim()}` : ''}${bookingNote.trim() ? ` | Ghi chú: ${bookingNote.trim()}` : ''}`,
+        ghi_chu: bookingNote.trim(),
       });
 
-      const successMsg = '🎉 Đặt lịch xem phòng thành công!\nChủ trọ sẽ liên hệ với bạn qua SĐT để xác nhận.';
-      if (Platform.OS === 'web') alert(successMsg); else Alert.alert('Thành công 🎉', successMsg);
+      if (Platform.OS === 'web') {
+        alert('Đặt lịch xem phòng thành công!\nChủ trọ sẽ liên hệ với bạn qua SĐT để xác nhận.');
+      } else {
+        Alert.alert('Thành công', 'Đặt lịch xem phòng thành công!\nChủ trọ sẽ liên hệ với bạn qua SĐT để xác nhận.');
+      }
       setModalVisible(false);
       setBookingNote('');
-    } catch (e: any) {
-      console.error('BOOKING ERROR:', e);
-      const errMsg = e?.response?.data?.error || e?.message || 'Không thể gửi lịch hẹn. Vui lòng thử lại.';
-      if (Platform.OS === 'web') alert(`Lỗi: ${errMsg}`); else Alert.alert('Lỗi', errMsg);
+    } catch (e) {
+      console.log('BOOKING ERROR:', e);
+      const message = (e as any)?.response?.data?.error || 'Không thể gửi yêu cầu đặt phòng.';
+      if (Platform.OS === 'web') alert(message);
+      else Alert.alert('Lỗi', message);
     } finally {
       setSubmitting(false);
     }
@@ -161,7 +319,6 @@ export default function RoomDetailScreen() {
   if (!room) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={{ fontSize: 50 }}>🏠</Text>
         <Text style={styles.errorTitle}>Không tìm thấy thông tin phòng trọ</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>← Quay lại trang trước</Text>
@@ -176,8 +333,8 @@ export default function RoomDetailScreen() {
       ? room.danh_sach_anh.map((a: any) => a.duong_dan_anh)
       : [room.anh_dai_dien || 'https://placehold.co/600x400/e8f0fe/007AFF?text=Phong+Tro'];
 
-  const formattedPrice = room.gia_thue ? room.gia_thue.toLocaleString('vi-VN') : '0';
-  const formattedDeposit = room.tien_coc ? room.tien_coc.toLocaleString('vi-VN') : formattedPrice;
+  const formattedPrice = room.gia_thue ? formatNumber(room.gia_thue) : '0';
+  const formattedDeposit = room.tien_coc ? formatNumber(room.tien_coc) : formattedPrice;
 
   return (
     <View style={styles.container}>
@@ -192,15 +349,23 @@ export default function RoomDetailScreen() {
             {room.tieu_de || `Phòng ${room.so_phong}`}
           </Text>
 
-          <TouchableOpacity style={styles.navShareBtn} onPress={() => {}}>
-            <Text style={{ fontSize: 18 }}>♡</Text>
+          <TouchableOpacity
+            style={styles.navShareBtn}
+            onPress={() => {
+              if (!user) router.push('/login');
+              else void toggleFavorite(room.ma_phong);
+            }}
+          >
+            <Text style={{ fontSize: 20, color: favoriteIds.has(Number(room.ma_phong)) ? '#DC2626' : '#475569' }}>
+              {favoriteIds.has(Number(room.ma_phong)) ? '♥' : '♡'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
         <View style={[styles.mainWrapper, { maxWidth: isDesktop ? 1000 : '100%' }]}>
-          
+
           {/* SLIDER / ALBUM ẢNH PHÒNG TRỌ */}
           <View style={styles.albumContainer}>
             <ScrollView
@@ -241,14 +406,14 @@ export default function RoomDetailScreen() {
               ]}
             >
               <Text style={styles.statusBadgeText}>
-                {room.trang_thai === 'ConTrong' ? '🟢 Còn trống' : '🔴 Đã cho thuê'}
+                {room.trang_thai === 'ConTrong' ? 'Còn trống' : 'Đã cho thuê'}
               </Text>
             </View>
           </View>
 
           {/* KHỐI NỘI DUNG CHÍNH */}
           <View style={styles.contentPadding}>
-            
+
             {/* TIÊU ĐỀ PHÒNG TRỌ */}
             <Text style={styles.roomTitle}>{room.tieu_de || `Phòng ${room.so_phong}`}</Text>
 
@@ -313,7 +478,7 @@ export default function RoomDetailScreen() {
 
             {/* KHỐI MÔ TẢ CHI TIẾT */}
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeaderTitle}>📝 Mô tả chi tiết</Text>
+              <Text style={styles.sectionHeaderTitle}>Mô tả chi tiết</Text>
               <Text style={styles.descriptionText}>
                 {room.mo_ta ||
                   `Phòng trọ rộng rãi, thoáng mát tại ${room.khu_tro?.ten_khu_tro || 'khu vực an ninh'}. Giao thông thuận tiện, gần trường học, chợ và siêu thị. Giờ giấc tự do, chủ trọ thân thiện, điện nước giá dân.`}
@@ -339,6 +504,72 @@ export default function RoomDetailScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionHeaderTitle}>Đánh giá của người thuê ({reviews.length})</Text>
+              {reviews.length === 0 ? (
+                <Text style={{ color: '#6B7280', fontSize: 13, marginTop: 8 }}>Chưa có đánh giá hiển thị.</Text>
+              ) : (
+                <View style={{ gap: 10, marginTop: 10 }}>
+                  {reviews.map((review) => (
+                    <View key={review.ma_danh_gia} style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 10, gap: 4 }}>
+                      <Text style={{ color: '#B7791F', fontSize: 14 }}>{'★'.repeat(review.so_sao)}{'☆'.repeat(5 - review.so_sao)}</Text>
+                      <Text style={{ color: '#1F2937', fontSize: 13, fontWeight: '600' }}>{review.ho_ten || 'Người thuê'}</Text>
+                      <Text style={{ color: '#4B5563', fontSize: 13 }}>{review.noi_dung}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {userRole === 'NguoiThue' && myBookingStatus !== 'DaDuyet' && !hasViewed && (
+                <View style={{ marginTop: 16, backgroundColor: '#FFFBEB', borderRadius: 10, padding: 12 }}>
+                  <Text style={{ color: '#92400E', fontSize: 13, lineHeight: 19 }}>
+                    {myBookingStatus === 'ChoDuyet'
+                      ? 'Yêu cầu thuê phòng của bạn đang chờ chủ trọ duyệt. Bạn có thể đánh giá sau khi được chấp nhận hoặc sau khi đã xem phòng.'
+                      : 'Bạn có thể đánh giá phòng sau khi đã đi xem phòng (chủ trọ xác nhận đã xem) hoặc khi yêu cầu thuê được chấp nhận.'}
+                  </Text>
+                </View>
+              )}
+
+              {userRole === 'NguoiThue' && (myBookingStatus === 'DaDuyet' || hasViewed) && hasReviewed && (
+                <Text style={{ marginTop: 14, color: '#15803D', fontSize: 13 }}>Bạn đã đánh giá phòng này. Xem/xóa tại "Đánh giá của tôi".</Text>
+              )}
+
+              {userRole === 'NguoiThue' && (myBookingStatus === 'DaDuyet' || hasViewed) && !hasReviewed && (
+                <View style={{ marginTop: 16, gap: 10 }}>
+                  <Text style={{ color: '#1F2937', fontSize: 14, fontWeight: '600' }}>Gửi đánh giá</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {[1, 2, 3, 4, 5].map((stars) => (
+                      <TouchableOpacity key={stars} onPress={() => setReviewStars(stars)} accessibilityRole="button" accessibilityLabel={`${stars} sao`}>
+                        <Text style={{ color: stars <= reviewStars ? '#D97706' : '#D1D5DB', fontSize: 26 }}>★</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    value={reviewText}
+                    onChangeText={setReviewText}
+                    placeholder="Chia sẻ trải nghiệm của bạn về căn phòng"
+                    multiline
+                    style={{ minHeight: 84, borderWidth: 1, borderColor: '#DDE1E6', borderRadius: 6, padding: 10, textAlignVertical: 'top' }}
+                  />
+                  <TouchableOpacity
+                    onPress={submitReview}
+                    disabled={submittingReview}
+                    style={{ alignSelf: 'flex-start', backgroundColor: '#007AFF', borderRadius: 6, paddingHorizontal: 14, paddingVertical: 9 }}
+                  >
+                    {submittingReview
+                      ? <ActivityIndicator color="#FFFFFF" />
+                      : <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13 }}>Gửi đánh giá</Text>}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!user && (
+                <TouchableOpacity onPress={() => router.push('/login')} style={{ marginTop: 12 }}>
+                  <Text style={{ color: '#007AFF', fontSize: 13 }}>Đăng nhập để gửi đánh giá</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
           </View>
         </View>
       </ScrollView>
@@ -346,26 +577,83 @@ export default function RoomDetailScreen() {
       {/* THANH BOTTOM CỐ ĐỊNH Ở ĐÁY */}
       <View style={styles.bottomBarWrapper}>
         <View style={[styles.bottomBarContent, { maxWidth: isDesktop ? 1000 : '100%' }]}>
-          <View>
+          <View style={styles.bottomPriceRow}>
             <Text style={styles.bottomPriceLabel}>Giá thuê duy trì</Text>
             <Text style={styles.bottomPriceVal}>{formattedPrice} đ/tháng</Text>
           </View>
 
-          <View style={styles.bottomActionRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.bottomActionRow}
+          >
             {/* NÚT GỌI ĐIỆN */}
             <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
               <Text style={styles.callBtnIcon}>📞</Text>
               <Text style={styles.callBtnText}>Gọi điện</Text>
             </TouchableOpacity>
 
+            {/* NÚT YÊU CẦU THUÊ PHÒNG */}
+            {room.trang_thai === 'ConTrong' && myBookingStatus !== 'DaDuyet' && (
+              <TouchableOpacity
+                style={[styles.rentBtn, myBookingStatus === 'ChoDuyet' && { opacity: 0.6 }]}
+                onPress={handleOpenRentModal}
+                disabled={myBookingStatus === 'ChoDuyet'}
+              >
+                <Text style={styles.bookBtnText}>{myBookingStatus === 'ChoDuyet' ? 'Đã gửi yêu cầu' : 'Thuê phòng'}</Text>
+              </TouchableOpacity>
+            )}
+
             {/* NÚT ĐẶT LỊCH XEM PHÒNG */}
             <TouchableOpacity style={styles.bookBtn} onPress={handleOpenBookingModal}>
               <Text style={styles.bookBtnIcon}>📅</Text>
-              <Text style={styles.bookBtnText}>Đặt lịch xem</Text>
+              <Text style={styles.bookBtnText}>{hasViewed ? 'Xem lại' : 'Đặt lịch xem'}</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </View>
+
+      {/* MODAL YÊU CẦU THUÊ PHÒNG */}
+      <Modal visible={rentModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📝 Yêu cầu thuê phòng</Text>
+              <TouchableOpacity onPress={() => setRentModalVisible(false)}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalRoomSub} numberOfLines={1}>
+              Phòng: {room.tieu_de || `Phòng ${room.so_phong}`}
+            </Text>
+
+            <Text style={styles.inputLabel}>Ngày dự kiến nhận phòng (YYYY-MM-DD)</Text>
+            <TextInput style={styles.inputField} placeholder="2026-10-15" value={rentDate} onChangeText={setRentDate} />
+
+            <Text style={styles.inputLabel}>Số người ở *</Text>
+            <TextInput style={styles.inputField} keyboardType="number-pad" value={rentPeople} onChangeText={setRentPeople} />
+
+            <Text style={styles.inputLabel}>Ghi chú cho chủ trọ</Text>
+            <TextInput
+              style={[styles.inputField, { height: 75, textAlignVertical: 'top' }]}
+              placeholder="Ví dụ: Em là sinh viên, muốn thuê dài hạn..."
+              multiline
+              value={rentNote}
+              onChangeText={setRentNote}
+            />
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setRentModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Hủy bỏ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleSubmitRent} disabled={rentSubmitting}>
+                {rentSubmitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.modalSubmitText}>Gửi yêu cầu</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* MODAL ĐẶT LỊCH HẸN XEM PHÒNG */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
@@ -775,11 +1063,15 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   bottomBarContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     width: '100%',
     alignSelf: 'center',
+  },
+  bottomPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   bottomPriceLabel: {
     fontSize: 11,
@@ -791,12 +1083,16 @@ const styles = StyleSheet.create({
     color: '#007AFF',
   },
   bottomActionRow: {
+    flexGrow: 1,
     flexDirection: 'row',
     gap: 10,
   },
   callBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 1,
+    flexShrink: 0,
     backgroundColor: '#34C759',
     paddingHorizontal: 16,
     paddingVertical: 11,
@@ -814,8 +1110,22 @@ const styles = StyleSheet.create({
   bookBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 1,
+    flexShrink: 0,
     backgroundColor: '#007AFF',
     paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 14,
+  },
+  rentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 1,
+    flexShrink: 0,
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 14,
     paddingVertical: 11,
     borderRadius: 14,
   },

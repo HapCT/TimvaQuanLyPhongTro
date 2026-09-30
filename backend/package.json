@@ -6,6 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "migrate:admin-workflows": "node scripts/migrateAdminWorkflows.js",
+    "migrate:billing": "node scripts/migrateBilling.js",
+    "migrate:notifications": "node scripts/migrateNotifications.js",
+    "migrate:notifications": "node scripts/migrateNotifications.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -65,6 +65,19 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  primaryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#007AFF',
+  },
+
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
   // =========================
   // QUICK STATS ROW
   // =========================

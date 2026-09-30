@@ -1,19 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  ScrollView,
-  Image,
-  useWindowDimensions,
+    ActivityIndicator,
+    Image,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
-import { firebaseAuth } from '@/services/firebase';
+import Pagination, { ADMIN_PAGE_SIZE } from '@/components/admin/Pagination';
 import { backendApi } from '@/services/backend';
-import { User, RoleFilter } from '@/types';
+import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/admin/users-management.styles';
+import { RoleFilter, User } from '@/types';
 import { showAlert } from '@/utils/alert';
 
 interface UsersManagementProps {
@@ -28,6 +29,7 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(isMobile ? 'cards' : 'table');
 
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
@@ -56,8 +58,9 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
       setLoading(true);
       const response = await backendApi.get('/api/users');
       setUsers(response.data || []);
-    } catch (e) {
+    } catch (e: any) {
       console.log('LOAD USERS ERROR:', e);
+      console.log('LOAD USERS ERROR:', e.response?.status, e.response?.data);
       showAlert('Lỗi', 'Có lỗi xảy ra khi tải danh sách người dùng.');
     } finally {
       setLoading(false);
@@ -97,6 +100,15 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
     });
   }, [users, search, roleFilter]);
 
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * ADMIN_PAGE_SIZE,
+    currentPage * ADMIN_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, roleFilter]);
+
   const toggleLockUser = async (user: User) => {
     if (user.ma_nguoi_dung === currentAdminId) {
       showAlert('Không hợp lệ', 'Bạn không thể tự khóa tài khoản của chính mình.');
@@ -120,7 +132,7 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
               await backendApi.put(`/api/users/${user.ma_nguoi_dung}/toggle-lock`, {
                 is_locked: isLocking
               });
-              
+
               showAlert('Thành công', `Đã ${actionText.toLowerCase()} tài khoản.`);
               loadUsers();
             } catch (e: any) {
@@ -132,6 +144,76 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
             }
           }
         }
+      ]
+    );
+  };
+
+  const changeUserRole = (user: User) => {
+    if (user.ma_nguoi_dung === currentAdminId) {
+      showAlert('Không hợp lệ', 'Bạn không thể tự đổi vai trò tài khoản của mình.');
+      return;
+    }
+
+    const roles = [
+      { value: 'NguoiThue', label: 'Người thuê' },
+      { value: 'ChuTro', label: 'Chủ trọ' },
+      { value: 'QuanTri', label: 'Quản trị viên' },
+    ];
+    showAlert(
+      'Đổi vai trò tài khoản',
+      `Chọn vai trò mới cho ${user.ho_ten || user.email || 'người dùng'}.`,
+      [
+        ...roles
+          .filter((role) => role.value !== user.vai_tro)
+          .map((role) => ({
+            text: role.label,
+            onPress: async () => {
+              try {
+                setDeletingId(user.ma_nguoi_dung);
+                await backendApi.put(`/api/users/${user.ma_nguoi_dung}/role`, { vai_tro: role.value });
+                setUsers((previous) => previous.map((item) => (
+                  item.ma_nguoi_dung === user.ma_nguoi_dung ? { ...item, vai_tro: role.value } : item
+                )));
+                showAlert('Thành công', `Đã đổi vai trò thành ${role.label}.`);
+              } catch (error: any) {
+                showAlert('Lỗi', error?.response?.data?.error || 'Không thể đổi vai trò.');
+              } finally {
+                setDeletingId(null);
+              }
+            },
+          })),
+        { text: 'Hủy', style: 'cancel' },
+      ]
+    );
+  };
+
+  const deleteUser = (user: User) => {
+    if (user.ma_nguoi_dung === currentAdminId) {
+      showAlert('Không hợp lệ', 'Bạn không thể xóa tài khoản của chính mình.');
+      return;
+    }
+
+    showAlert(
+      'Xóa tài khoản',
+      `Xóa tài khoản ${user.ho_ten || user.email || user.ma_nguoi_dung}? Dữ liệu liên quan có thể bị xóa theo.`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingId(user.ma_nguoi_dung);
+              await backendApi.delete(`/api/users/${user.ma_nguoi_dung}`);
+              setUsers((previous) => previous.filter((item) => item.ma_nguoi_dung !== user.ma_nguoi_dung));
+              showAlert('Đã xóa', 'Tài khoản đã được xóa khỏi hệ thống.');
+            } catch (error: any) {
+              showAlert('Lỗi', error?.response?.data?.error || 'Không thể xóa tài khoản.');
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
       ]
     );
   };
@@ -161,7 +243,7 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
     if (user.is_locked) {
       return { text: '🔒 Bị khóa', badgeStyle: { backgroundColor: '#FEE2E2' } };
     }
-    
+
     return roleObj;
   };
 
@@ -181,19 +263,35 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
         <Text style={styles.lockedText}>Tài khoản của bạn</Text>
       </View>
     ) : (
-      <TouchableOpacity
-        style={[styles.deleteButton, user.is_locked ? { backgroundColor: '#E0F2FE', borderColor: '#BAE6FD' } : {}]}
-        onPress={() => toggleLockUser(user)}
-        disabled={deletingId === user.ma_nguoi_dung}
-      >
-        {deletingId === user.ma_nguoi_dung ? (
-          <ActivityIndicator size="small" color={user.is_locked ? "#0284C7" : "#E53935"} />
-        ) : (
-          <Text style={[styles.deleteText, user.is_locked ? { color: '#0369A1' } : {}]}>
-            {user.is_locked ? 'Mở khóa' : 'Khóa'}
-          </Text>
-        )}
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        <TouchableOpacity
+          style={[styles.deleteButton, user.is_locked ? { backgroundColor: '#E0F2FE', borderColor: '#BAE6FD' } : {}]}
+          onPress={() => toggleLockUser(user)}
+          disabled={deletingId === user.ma_nguoi_dung}
+        >
+          {deletingId === user.ma_nguoi_dung ? (
+            <ActivityIndicator size="small" color={user.is_locked ? '#0284C7' : '#E53935'} />
+          ) : (
+            <Text style={[styles.deleteText, user.is_locked ? { color: '#0369A1' } : {}]}>
+              {user.is_locked ? 'Mở khóa' : 'Khóa'}
+            </Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={{ minWidth: 75, height: 34, paddingHorizontal: 8, borderWidth: 1, borderColor: '#DDE1E6', borderRadius: 7, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}
+          onPress={() => changeUserRole(user)}
+          disabled={deletingId === user.ma_nguoi_dung}
+        >
+          <Text style={{ color: '#444', fontSize: 12, fontWeight: '600' }}>Vai trò</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => deleteUser(user)}
+          disabled={deletingId === user.ma_nguoi_dung}
+        >
+          <Text style={styles.deleteText}>Xóa</Text>
+        </TouchableOpacity>
+      </View>
     )
   );
 
@@ -309,7 +407,7 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
       ) : viewMode === 'cards' ? (
         /* DẠNG THẺ (MOBILE) */
         <View style={styles.mobileCardList}>
-          {filteredUsers.map((user) => {
+          {paginatedUsers.map((user) => {
             const role = getRoleInfo(user);
             const isCurrentAdmin = user.ma_nguoi_dung === currentAdminId;
             return (
@@ -360,7 +458,7 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
               <Text style={[styles.headerCell, styles.actionColumn]}>Thao tác</Text>
             </View>
 
-            {filteredUsers.map((user) => {
+            {paginatedUsers.map((user) => {
               const isCurrentAdmin = user.ma_nguoi_dung === currentAdminId;
               return (
                 <View key={user.ma_nguoi_dung} style={styles.tableRow}>
@@ -393,6 +491,11 @@ export default function UsersManagement({ onStatsUpdate }: UsersManagementProps)
           </View>
         </ScrollView>
       )}
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredUsers.length}
+        onPageChange={setCurrentPage}
+      />
     </View>
   );
 }

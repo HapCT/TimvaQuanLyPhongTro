@@ -1,22 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  ScrollView,
-  Image,
-  useWindowDimensions,
+    ActivityIndicator,
+    Image,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
-import { firebaseAuth } from '@/services/firebase';
-import { backendApi } from '@/services/backend';
-import { KhuTro } from '@/types';
-import { styles } from '@/styles/admin/rooms-management.styles';
-import { styles as formStyles } from '@/styles/admin/room-form.styles';
 import KhuTroFormModal from '@/components/admin/KhuTroFormModal';
-import ActionSheetModal from '@/components/common/ActionSheetModal';
+import Pagination, { ADMIN_PAGE_SIZE } from '@/components/admin/Pagination';
+import { backendApi } from '@/services/backend';
+import { styles } from '@/styles/admin/rooms-management.styles';
+import { KhuTro } from '@/types';
 import { showAlert } from '@/utils/alert';
 
 export default function KhuTroManagement() {
@@ -31,6 +29,7 @@ export default function KhuTroManagement() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(isMobile ? 'cards' : 'table');
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -64,14 +63,24 @@ export default function KhuTroManagement() {
       String(k.dia_chi || '').toLowerCase().includes(keyword) ||
       String(k.thanh_pho || '').toLowerCase().includes(keyword);
 
-    const matchStatus = statusFilter === 'ALL' || k.trang_thai === statusFilter;
+    const matchStatus = statusFilter === 'ALL'
+      || (statusFilter === 'HoatDong' && ['HoatDong', 'DangHoatDong'].includes(String(k.trang_thai)))
+      || k.trang_thai === statusFilter;
 
     return matchSearch && matchStatus;
   });
+  const paginatedList = filteredList.slice(
+    (currentPage - 1) * ADMIN_PAGE_SIZE,
+    currentPage * ADMIN_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
 
   const stats = {
     total: khuTroList.length,
-    active: khuTroList.filter((k) => k.trang_thai === 'HoatDong').length,
+    active: khuTroList.filter((k) => ['HoatDong', 'DangHoatDong'].includes(String(k.trang_thai))).length,
   };
 
   const openAddForm = () => {
@@ -145,7 +154,7 @@ export default function KhuTroManagement() {
               <Text style={{ color: '#888' }}>Không tìm thấy khu trọ nào.</Text>
             </View>
           ) : (
-            filteredList.map((k) => (
+            paginatedList.map((k) => (
               <View key={k.ma_khu_tro} style={styles.tableRow}>
                 <View style={[styles.cell, { width: 50 }]}>
                   <Text style={{ fontSize: 13, color: '#555' }}>#{k.ma_khu_tro}</Text>
@@ -218,7 +227,7 @@ export default function KhuTroManagement() {
           <Text style={{ color: '#888' }}>Không tìm thấy khu trọ nào.</Text>
         </View>
       ) : (
-        filteredList.map((k) => (
+        paginatedList.map((k) => (
           <View key={k.ma_khu_tro} style={styles.mobileRoomCard}>
             <View style={styles.mobileCardHeader}>
               {k.anh_dai_dien ? (
@@ -282,6 +291,9 @@ export default function KhuTroManagement() {
         </View>
 
         <View style={styles.viewToggleRow}>
+          <TouchableOpacity style={styles.primaryButton} onPress={openAddForm}>
+            <Text style={styles.primaryButtonText}>+ Thêm khu trọ</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggleBtn, viewMode === 'cards' && styles.toggleBtnActive]}
             onPress={() => setViewMode('cards')}
@@ -348,6 +360,11 @@ export default function KhuTroManagement() {
           </View>
           
           {viewMode === 'table' ? renderTable() : renderCards()}
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredList.length}
+            onPageChange={setCurrentPage}
+          />
         </>
       )}
 

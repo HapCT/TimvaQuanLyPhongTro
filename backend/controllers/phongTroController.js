@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { notifyUser } = require('../services/notifications');
 
 const PHONG_FIELDS = [
   'so_phong', 'tieu_de', 'tang', 'dien_tich', 'gia_thue', 'tien_coc',
@@ -60,7 +61,7 @@ const inClause = (arr) => arr.map(() => '?').join(',');
 // ---------------------------------------------------------------------
 const getAll = async (req, res) => {
   try {
-    const [phongData] = await pool.query('SELECT * FROM phong_tro ORDER BY ma_phong DESC');
+    const [phongData] = await pool.query('SELECT * FROM phong_tro ORDER BY ngay_tao DESC');
     const [khuTroData] = await pool.query('SELECT * FROM khu_tro');
     const [anhData] = await pool.query('SELECT * FROM anh_phong');
     const [ptiData] = await pool.query('SELECT * FROM phong_tien_ich');
@@ -98,11 +99,9 @@ const getAll = async (req, res) => {
 
     const merged = phongData.map((p) => {
       const khuTro = khuTroMap[p.ma_khu_tro] || null;
-      const danhSachAnh = (anhByPhong[p.ma_phong] || []).sort((a, b) => {
-        const aMain = a.anh_chinh || a.la_anh_dai_dien;
-        const bMain = b.anh_chinh || b.la_anh_dai_dien;
-        return aMain === bMain ? 0 : aMain ? -1 : 1;
-      });
+      const danhSachAnh = (anhByPhong[p.ma_phong] || []).sort((a, b) =>
+        a.la_anh_dai_dien === b.la_anh_dai_dien ? 0 : a.la_anh_dai_dien ? -1 : 1
+      );
       const anhDaiDien = danhSachAnh[0]?.duong_dan_anh || null;
 
       return {
@@ -131,7 +130,7 @@ const create = async (req, res) => {
     if (!roomData) return res.status(400).json({ error: 'Thiếu dữ liệu phòng.' });
 
     const kt = await layChuKhu(roomData.ma_khu_tro);
-    if (!kt || String(kt.ma_chu_tro || '').trim() !== String(req.user.id || '').trim()) {
+    if (!kt || (req.user.role !== 'QuanTri' && String(kt.ma_chu_tro || '').trim() !== String(req.user.id || '').trim())) {
       return res.status(403).json({ error: 'Khu trọ này không thuộc về bạn.' });
     }
 
@@ -169,8 +168,8 @@ const create = async (req, res) => {
     if (images && images.length > 0) {
       for (const img of images) {
         await conn.query(
-          'INSERT INTO anh_phong (ma_phong, duong_dan_anh, anh_chinh) VALUES (?, ?, ?)',
-          [maPhong, img.duong_dan_anh, !!(img.anh_chinh ?? img.la_anh_dai_dien)]
+          'INSERT INTO anh_phong (ma_phong, duong_dan_anh, la_anh_dai_dien) VALUES (?, ?, ?)',
+          [maPhong, img.duong_dan_anh, !!img.la_anh_dai_dien]
         );
       }
     }
@@ -194,12 +193,18 @@ const update = async (req, res) => {
     const { roomData, images, selectedTienIch, legalDocs } = req.body;
     if (!roomData) return res.status(400).json({ error: 'Thiếu dữ liệu phòng.' });
 
-    const own = await layPhongCuaToi(id, req.user.id);
+    let own;
+    if (req.user.role === 'QuanTri') {
+      const [rows] = await pool.query('SELECT ma_phong, ma_khu_tro FROM phong_tro WHERE ma_phong = ?', [id]);
+      own = rows[0] ? { phong: rows[0] } : { status: 404, error: 'Không tìm thấy phòng trọ' };
+    } else {
+      own = await layPhongCuaToi(id, req.user.id);
+    }
     if (own.error) return res.status(own.status).json({ error: own.error });
 
     if (roomData.ma_khu_tro && String(roomData.ma_khu_tro) !== String(own.phong.ma_khu_tro)) {
       const kt = await layChuKhu(roomData.ma_khu_tro);
-      if (!kt || kt.ma_chu_tro !== req.user.id) {
+      if (!kt || (req.user.role !== 'QuanTri' && String(kt.ma_chu_tro || '').trim() !== String(req.user.id || '').trim())) {
         return res.status(403).json({ error: 'Khu trọ này không thuộc về bạn.' });
       }
     }
@@ -208,7 +213,8 @@ const update = async (req, res) => {
     if (legalDocs) {
       const legal = validateLegalDocs(legalDocs);
       if (legal.error) return res.status(400).json({ error: legal.error });
-      legalRows = legal.rows;
+      // Chỉ thay hồ sơ khi có giấy tờ mới; nếu không thì giữ nguyên hồ sơ cũ
+      legalRows = legal.rows.length > 0 ? legal.rows : null;
     }
 
     // Sửa nội dung bài => phải được duyệt lại
@@ -244,8 +250,8 @@ const update = async (req, res) => {
     if (images && images.length > 0) {
       for (const img of images) {
         await conn.query(
-          'INSERT INTO anh_phong (ma_phong, duong_dan_anh, anh_chinh) VALUES (?, ?, ?)',
-          [id, img.duong_dan_anh, !!(img.anh_chinh ?? img.la_anh_dai_dien)]
+          'INSERT INTO anh_phong (ma_phong, duong_dan_anh, la_anh_dai_dien) VALUES (?, ?, ?)',
+          [id, img.duong_dan_anh, !!img.la_anh_dai_dien]
         );
       }
     }
@@ -266,13 +272,16 @@ const remove = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const own = await layPhongCuaToi(id, req.user.id);
-    if (own.error) return res.status(own.status).json({ error: own.error });
+    if (req.user.role !== 'QuanTri') {
+      const own = await layPhongCuaToi(id, req.user.id);
+      if (own.error) return res.status(own.status).json({ error: own.error });
+    }
 
     // LƯU Ý: ảnh + giấy tờ trên Cloudinary KHÔNG tự xóa khi xóa dòng DB.
     // Nếu muốn dọn file thật, cần lưu "public_id" lúc upload rồi gọi
     // cloudinary.uploader.destroy(public_id) ở đây trước khi xóa DB.
-    await pool.query('DELETE FROM phong_tro WHERE ma_phong = ?', [id]);
+    const [result] = await pool.query('DELETE FROM phong_tro WHERE ma_phong = ?', [id]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Không tìm thấy phòng trọ.' });
     res.json({ success: true, message: 'Đã xóa phòng thành công' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -297,7 +306,7 @@ const listForReview = async (req, res) => {
       sql += ' WHERE trang_thai_duyet = ?';
       params.push(status);
     }
-    sql += ' ORDER BY ma_phong DESC';
+    sql += ' ORDER BY ngay_tao DESC';
     const [phongs] = await pool.query(sql, params);
 
     if (phongs.length === 0) return res.json({ rooms: [], counts });
@@ -368,6 +377,14 @@ const review = async (req, res) => {
       return res.status(400).json({ error: 'Vui lòng nhập lý do từ chối.' });
     }
 
+    const [roomRows] = await pool.query(
+      `SELECT p.tieu_de, k.ma_chu_tro
+       FROM phong_tro p JOIN khu_tro k ON k.ma_khu_tro = p.ma_khu_tro
+       WHERE p.ma_phong = ? LIMIT 1`,
+      [id]
+    );
+    if (!roomRows[0]) return res.status(404).json({ error: 'Không tìm thấy bài đăng.' });
+
     const [result] = await pool.query(
       `UPDATE phong_tro
        SET trang_thai_duyet = ?, ly_do_tu_choi = ?, ngay_duyet = NOW(), nguoi_duyet = ?
@@ -377,6 +394,15 @@ const review = async (req, res) => {
 
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Không tìm thấy bài đăng.' });
 
+    await notifyUser({
+      userId: roomRows[0].ma_chu_tro,
+      title: ket_qua === 'DaDuyet' ? 'Bài đăng phòng đã được duyệt' : 'Bài đăng phòng bị từ chối',
+      body: ket_qua === 'DaDuyet'
+        ? `Bài đăng "${roomRows[0].tieu_de || `Phòng #${id}`}" đã được duyệt.`
+        : `Bài đăng "${roomRows[0].tieu_de || `Phòng #${id}`}" bị từ chối. Lý do: ${String(ly_do).trim()}`,
+      type: 'DuyetPhong',
+    });
+
     res.json({ success: true, trang_thai_duyet: ket_qua });
   } catch (error) {
     console.error('LỖI REVIEW:', error);
@@ -384,22 +410,27 @@ const review = async (req, res) => {
   }
 };
 
-// Cập nhật trạng thái phòng (Còn trống / Đã thuê)
+// Cập nhật trạng thái phòng (Còn trống / Đã thuê / Bảo trì)
+// - Chỉ đổi trang_thai. TUYỆT ĐỐI không cho đổi trang_thai_duyet ở đây (chỉ admin qua review()).
+// - Chủ trọ chỉ đổi được phòng của mình; Quản trị đổi được mọi phòng.
+const TRANG_THAI_PHONG_HOP_LE = ['ConTrong', 'DaThue', 'BaoTri'];
+
 const updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { trang_thai, trang_thai_duyet } = req.body || {};
-    
-    if (!trang_thai && !trang_thai_duyet) {
-      return res.status(400).json({ error: 'Cần truyền trang_thai hoặc trang_thai_duyet' });
+    const { trang_thai } = req.body || {};
+
+    if (!TRANG_THAI_PHONG_HOP_LE.includes(trang_thai)) {
+      return res.status(400).json({ error: 'trang_thai phải là ConTrong, DaThue hoặc BaoTri.' });
     }
 
-    if (trang_thai) {
-      await pool.query('UPDATE phong_tro SET trang_thai = ? WHERE ma_phong = ?', [trang_thai, id]);
+    if (req.user.role !== 'QuanTri') {
+      const own = await layPhongCuaToi(id, req.user.id);
+      if (own.error) return res.status(own.status).json({ error: own.error });
     }
-    if (trang_thai_duyet) {
-      await pool.query('UPDATE phong_tro SET trang_thai_duyet = ? WHERE ma_phong = ?', [trang_thai_duyet, id]);
-    }
+
+    const [result] = await pool.query('UPDATE phong_tro SET trang_thai = ? WHERE ma_phong = ?', [trang_thai, id]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Không tìm thấy phòng trọ' });
 
     res.json({ success: true, message: 'Cập nhật trạng thái thành công' });
   } catch (error) {
@@ -442,11 +473,9 @@ const getById = async (req, res) => {
     }
 
     const [anhData] = await pool.query('SELECT * FROM anh_phong WHERE ma_phong = ?', [id]);
-    const danhSachAnh = anhData.sort((a, b) => {
-      const aMain = a.anh_chinh || a.la_anh_dai_dien;
-      const bMain = b.anh_chinh || b.la_anh_dai_dien;
-      return aMain === bMain ? 0 : aMain ? -1 : 1;
-    });
+    const danhSachAnh = anhData.sort((a, b) =>
+      a.la_anh_dai_dien === b.la_anh_dai_dien ? 0 : a.la_anh_dai_dien ? -1 : 1
+    );
 
     const [ptiData] = await pool.query('SELECT ma_tien_ich FROM phong_tien_ich WHERE ma_phong = ?', [id]);
     let danhSachTienIch = [];

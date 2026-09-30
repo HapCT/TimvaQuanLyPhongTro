@@ -1,22 +1,22 @@
+import { formatNumber } from '@/utils/format';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  ScrollView,
-  Image,
-  useWindowDimensions,
+    ActivityIndicator,
+    Image,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
-import { firebaseAuth } from '@/services/firebase';
-import { backendApi } from '@/services/backend';
-import { RoomWithDetails, RoomStatus, KhuTro, AnhPhong, TienIch, PhongTienIch, PhongTro } from '@/types';
-import { styles } from '@/styles/admin/rooms-management.styles';
-import { styles as formStyles } from '@/styles/admin/room-form.styles';
+import Pagination, { ADMIN_PAGE_SIZE } from '@/components/admin/Pagination';
 import RoomFormModal from '@/components/admin/RoomFormModal';
 import ActionSheetModal from '@/components/common/ActionSheetModal';
+import { backendApi } from '@/services/backend';
+import { styles } from '@/styles/admin/rooms-management.styles';
+import { KhuTro, RoomStatus, RoomWithDetails, TienIch } from '@/types';
 import { showAlert } from '@/utils/alert';
 
 interface RoomsManagementProps {
@@ -25,7 +25,7 @@ interface RoomsManagementProps {
 
 // Các trạng thái chuẩn mà Admin có thể gán cho phòng
 const STATUS_OPTIONS: { key: RoomStatus; label: string }[] = [
-  { key: 'Trong', label: 'Còn trống' },
+  { key: 'ConTrong', label: 'Còn trống' },
   { key: 'DaThue', label: 'Đã thuê' },
   { key: 'BaoTri', label: 'Bảo trì' },
 ];
@@ -46,6 +46,7 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [khuTroFilter, setKhuTroFilter] = useState<number | 'ALL'>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(isMobile ? 'cards' : 'table');
 
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
@@ -71,7 +72,7 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
 
       const response = await backendApi.get('/api/phong-tro');
       const { rooms, khuTroList, tienIchList } = response.data;
-      
+
       setRooms(rooms || []);
       setKhuTroList(khuTroList || []);
       setTienIchList(tienIchList || []);
@@ -88,7 +89,7 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
   // ==========================================
   const stats = useMemo(() => {
     const total = rooms.length;
-    const trong = rooms.filter((r) => normalizeStatus(r.trang_thai) === 'trong').length;
+    const trong = rooms.filter((r) => normalizeStatus(r.trang_thai) === 'controng').length;
     const daThue = rooms.filter((r) => normalizeStatus(r.trang_thai) === 'dathue').length;
     const baoTri = rooms.filter((r) => normalizeStatus(r.trang_thai) === 'baotri').length;
     return { total, trong, daThue, baoTri };
@@ -117,6 +118,15 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
       return matchSearch && matchStatus && matchKhuTro;
     });
   }, [rooms, search, statusFilter, khuTroFilter]);
+
+  const paginatedRooms = filteredRooms.slice(
+    (currentPage - 1) * ADMIN_PAGE_SIZE,
+    currentPage * ADMIN_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, khuTroFilter]);
 
   // ==========================================
   // ĐỔI TRẠNG THÁI PHÒNG
@@ -213,7 +223,7 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
   // ==========================================
   const formatMoney = (value?: number | null) => {
     if (value === null || value === undefined) return '--';
-    return value.toLocaleString('vi-VN') + ' đ';
+    return formatNumber(value) + ' đ';
   };
 
   const getStatusInfo = (status: RoomStatus | null) => {
@@ -356,6 +366,9 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
         </View>
 
         <View style={styles.viewToggleRow}>
+          <TouchableOpacity style={styles.primaryButton} onPress={openAddForm}>
+            <Text style={styles.primaryButtonText}>+ Thêm phòng</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggleBtn, viewMode === 'cards' && styles.toggleBtnActive]}
             onPress={() => setViewMode('cards')}
@@ -381,8 +394,8 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
           <Text style={styles.quickStatValue}>{stats.total}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.quickStatCard, statusFilter === 'Trong' && styles.quickStatCardActive]}
-          onPress={() => setStatusFilter('Trong')}
+          style={[styles.quickStatCard, statusFilter === 'ConTrong' && styles.quickStatCardActive]}
+          onPress={() => setStatusFilter('ConTrong')}
         >
           <Text style={styles.quickStatTitle}>Còn trống</Text>
           <Text style={[styles.quickStatValue, { color: '#1D9A5E' }]}>{stats.trong}</Text>
@@ -468,7 +481,7 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
       ) : viewMode === 'cards' ? (
         /* DẠNG THẺ */
         <View style={styles.mobileCardList}>
-          {filteredRooms.map((room) => {
+          {paginatedRooms.map((room) => {
             const status = getStatusInfo(room.trang_thai);
             const expanded = expandedIds.has(room.ma_phong);
             return (
@@ -532,7 +545,7 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
               <Text style={[styles.headerCell, styles.actionColumn]}>Thao tác</Text>
             </View>
 
-            {filteredRooms.map((room) => {
+            {paginatedRooms.map((room) => {
               const status = getStatusInfo(room.trang_thai);
               const expanded = expandedIds.has(room.ma_phong);
               return (
@@ -574,6 +587,12 @@ export default function RoomsManagement({ onStatsUpdate }: RoomsManagementProps)
           </View>
         </ScrollView>
       )}
+
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredRooms.length}
+        onPageChange={setCurrentPage}
+      />
 
       <RoomFormModal
         visible={formVisible}
