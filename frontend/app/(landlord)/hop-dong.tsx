@@ -2,7 +2,9 @@ import { formatNumber } from '@/utils/format';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     Text,
     TextInput,
@@ -41,13 +43,24 @@ interface Contract {
   trang_thai: string;
   dieu_khoan?: string | null;
   nguoi_thue?: { ho_ten?: string; so_dien_thoai?: string };
-  phong?: { tieu_de?: string; so_phong?: string; ten_khu_tro?: string };
+  phong?: {
+    tieu_de?: string;
+    so_phong?: string;
+    ten_khu_tro?: string;
+    dia_chi?: string;
+    dien_tich?: number | null;
+    tang?: number | null;
+    so_nguoi_dang_o?: number;
+    so_nguoi_toi_da?: number;
+    so_cho_con_lai?: number;
+  };
   thanh_toan: Payment[];
 }
 
 export default function HopDongScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'contracts' | 'billing'>('contracts');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -126,7 +139,7 @@ export default function HopDongScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+    <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
       <View style={{ width: '100%', maxWidth: 1100, alignSelf: 'center', gap: 20 }}>
         <View style={styles.sectionHeader}>
           <View>
@@ -138,6 +151,24 @@ export default function HopDongScreen() {
           </TouchableOpacity>
         </View>
 
+        <View style={{ flexDirection: 'row', padding: 4, gap: 4, backgroundColor: '#E9EEF5', borderRadius: 8 }}>
+          {[
+            { key: 'contracts' as const, label: `Hợp đồng (${contracts.length})` },
+            { key: 'billing' as const, label: 'Hóa đơn & thanh toán' },
+          ].map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              onPress={() => setActiveTab(tab.key)}
+              style={{ flex: 1, minHeight: 40, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 10, borderRadius: 6, backgroundColor: activeTab === tab.key ? '#FFFFFF' : 'transparent' }}
+            >
+              <Text style={{ color: activeTab === tab.key ? '#1D4ED8' : '#4B5563', fontSize: 13, fontWeight: activeTab === tab.key ? '700' : '500' }}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {activeTab === 'contracts' && <>
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View>
@@ -191,11 +222,21 @@ export default function HopDongScreen() {
                 <View key={contract.ma_hop_dong} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 14, gap: 10 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                     <View style={{ flex: 1, minWidth: 200 }}>
-                      <Text style={{ color: '#1F2937', fontSize: 15, fontWeight: '700' }}>{contract.phong?.tieu_de || `Phòng ${contract.phong?.so_phong || ''}`}</Text>
+                      <Text style={{ color: '#1F2937', fontSize: 15, fontWeight: '700' }}>
+                        {contract.phong?.tieu_de || 'Phòng trọ'}{contract.phong?.so_phong ? ` · Phòng ${contract.phong.so_phong}` : ''}
+                      </Text>
                       <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>{contract.nguoi_thue?.ho_ten || 'Người thuê'} · {contract.phong?.ten_khu_tro || 'Khu trọ'}</Text>
                     </View>
                     <Text style={{ color: contract.trang_thai === 'DangHieuLuc' ? '#15803D' : '#6B7280', fontSize: 13, fontWeight: '600' }}>
                       {contract.trang_thai === 'DangHieuLuc' ? 'Đang hiệu lực' : contract.trang_thai === 'KetThuc' ? 'Đã kết thúc' : 'Đã hủy'}
+                    </Text>
+                  </View>
+                  {!!contract.phong?.dia_chi && <Text style={{ color: '#4B5563', fontSize: 12 }}>Địa chỉ: {contract.phong.dia_chi}</Text>}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                    <Text style={{ color: '#4B5563', fontSize: 12 }}>Diện tích: {contract.phong?.dien_tich ?? '--'} m²</Text>
+                    <Text style={{ color: '#4B5563', fontSize: 12 }}>Tầng: {contract.phong?.tang ?? '--'}</Text>
+                    <Text style={{ color: '#4B5563', fontSize: 12 }}>
+                      Sức chứa: {contract.phong?.so_nguoi_dang_o ?? 0}/{contract.phong?.so_nguoi_toi_da ?? '--'} · còn {contract.phong?.so_cho_con_lai ?? '--'} chỗ
                     </Text>
                   </View>
                   <Text style={{ color: '#4B5563', fontSize: 13 }}>
@@ -226,11 +267,13 @@ export default function HopDongScreen() {
             </View>
           )}
         </View>
-        <View style={styles.sectionCard}>
+        </>}
+        {activeTab === 'billing' && <View style={styles.sectionCard}>
           <BillingManagement />
-        </View>
+        </View>}
       </View>
       <Modal visible={!!selectedBooking} transparent animationType="fade" onRequestClose={() => setSelectedBooking(null)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 8, padding: 20, gap: 12 }}>
             <Text style={{ color: '#1F2937', fontSize: 18, fontWeight: '700' }}>Tạo hợp đồng thuê</Text>
@@ -248,6 +291,7 @@ export default function HopDongScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
     </ScrollView>

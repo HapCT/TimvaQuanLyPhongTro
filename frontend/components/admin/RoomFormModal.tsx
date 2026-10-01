@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { formatMoneyInput } from '@/utils/format';
 import {
     ActivityIndicator,
     Image,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     Text,
     TextInput,
@@ -75,8 +78,8 @@ export default function RoomFormModal({
       setTieuDe(editingRoom.tieu_de || '');
       setMoTa(editingRoom.mo_ta || '');
       setDienTich(editingRoom.dien_tich != null ? String(editingRoom.dien_tich) : '');
-      setGiaThue(editingRoom.gia_thue != null ? String(editingRoom.gia_thue) : '');
-      setTienCoc(editingRoom.tien_coc != null ? String(editingRoom.tien_coc) : '');
+      setGiaThue(editingRoom.gia_thue != null ? formatMoneyInput(String(editingRoom.gia_thue)) : '');
+      setTienCoc(editingRoom.tien_coc != null ? formatMoneyInput(String(editingRoom.tien_coc)) : '');
       setTang(editingRoom.tang != null ? String(editingRoom.tang) : '');
       setSoNguoiToiDa(editingRoom.so_nguoi_toi_da != null ? String(editingRoom.so_nguoi_toi_da) : '');
       setTrangThai(editingRoom.trang_thai || 'ConTrong');
@@ -173,7 +176,8 @@ export default function RoomFormModal({
   };
 
   const parseNumber = (value: string): number | null => {
-    const trimmed = value.trim().replace(',', '.');
+    // Bỏ dấu chấm ngăn cách hàng nghìn (do formatMoneyInput thêm vào) trước khi parse
+    const trimmed = value.trim().replace(/\./g, '').replace(',', '.');
     if (!trimmed) return null;
     const n = Number(trimmed);
     return Number.isNaN(n) ? null : n;
@@ -236,7 +240,7 @@ export default function RoomFormModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.title}>{isEdit ? 'Sửa phòng trọ' : 'Thêm phòng trọ mới'}</Text>
@@ -245,7 +249,7 @@ export default function RoomFormModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+          <ScrollView style={styles.body} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
             {/* KHU TRỌ */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>
@@ -320,7 +324,7 @@ export default function RoomFormModal({
                   placeholder="VD: 2500000"
                   placeholderTextColor="#999"
                   value={giaThue}
-                  onChangeText={setGiaThue}
+                  onChangeText={(v) => setGiaThue(formatMoneyInput(v))}
                   keyboardType="numeric"
                 />
               </View>
@@ -331,7 +335,7 @@ export default function RoomFormModal({
                   placeholder="VD: 2500000"
                   placeholderTextColor="#999"
                   value={tienCoc}
-                  onChangeText={setTienCoc}
+                  onChangeText={(v) => setTienCoc(formatMoneyInput(v))}
                   keyboardType="numeric"
                 />
               </View>
@@ -490,7 +494,7 @@ export default function RoomFormModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -8,22 +8,31 @@ import { firebaseAuth } from './firebase';
  * - Web (localhost)   : http://localhost:3000
  * - Mobile (Expo Go) : tự dùng IP máy chủ từ Expo Constants (debuggerHost)
  *
- * Nếu cần đặt thủ công, thay MANUAL_IP bằng IP LAN của máy bạn (ví dụ: '192.168.1.10')
+ * Có thể đặt EXPO_PUBLIC_BACKEND_URL khi dùng tunnel hoặc backend từ xa.
  */
 const MANUAL_IP: string | null = null; // <- Đặt IP thủ công nếu cần, ví dụ: '192.168.1.10'
+const PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, '');
 
 function getBackendUrl(): string {
+  // Trên Web (máy tính): ưu tiên dùng localhost trực tiếp trừ khi có URL sản phẩm/remote thực tế (không phải localtunnel tạm thời)
+  if (Platform.OS === 'web') {
+    if (PUBLIC_BACKEND_URL && !PUBLIC_BACKEND_URL.includes('.loca.lt')) {
+      return PUBLIC_BACKEND_URL;
+    }
+    return 'http://localhost:3000';
+  }
+
   // Nếu đã đặt IP thủ công thì dùng luôn
   if (MANUAL_IP) {
     return `http://${MANUAL_IP}:3000`;
   }
 
-  // Trên Web luôn dùng localhost
-  if (Platform.OS === 'web') {
-    return 'http://localhost:3000';
+  // Nếu có EXPO_PUBLIC_BACKEND_URL (như ngrok/tunnel đang chạy)
+  if (PUBLIC_BACKEND_URL && !PUBLIC_BACKEND_URL.includes('.loca.lt')) {
+    return PUBLIC_BACKEND_URL;
   }
 
-  // Trên Mobile (Android/iOS), lấy IP từ Expo debuggerHost (cùng mạng LAN với máy tính)
+  // Trên Mobile (Android/iOS Expo Go), lấy IP từ Expo debuggerHost (cùng mạng LAN với máy tính)
   const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest2?.extra?.expoGo?.debuggerHost;
   if (debuggerHost) {
     const ip = debuggerHost.split(':')[0]; // Lấy phần IP, bỏ port
@@ -41,6 +50,7 @@ export const backendApi = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
+    ...(BACKEND_URL.includes('.loca.lt') ? { 'bypass-tunnel-reminder': 'true' } : {}),
   },
 });
 

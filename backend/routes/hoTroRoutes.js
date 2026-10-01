@@ -5,6 +5,8 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 
 router.post('/', requireAuth, hoTroController.create);
 router.get('/mine', requireAuth, hoTroController.getMine);
+router.get('/chu-tro', requireRole('ChuTro'), hoTroController.getForLandlord);
+router.patch('/chu-tro/:id', requireRole('ChuTro'), hoTroController.updateByLandlord);
 router.get('/admin', requireRole('QuanTri'), hoTroController.getForAdmin);
 router.patch('/:id', requireRole('QuanTri'), hoTroController.update);
 

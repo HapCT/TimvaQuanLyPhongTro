@@ -33,6 +33,19 @@ async function migrate() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  const [supportStatusColumn] = await pool.query(
+    `SELECT COLUMN_NAME
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'yeu_cau_ho_tro'
+       AND COLUMN_NAME = 'trang_thai'`
+  );
+  if (supportStatusColumn.length === 0) {
+    await pool.query(
+      "ALTER TABLE yeu_cau_ho_tro ADD COLUMN trang_thai VARCHAR(20) NOT NULL DEFAULT 'Moi' AFTER noi_dung"
+    );
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dat_lich_xem (
       ma_dat_lich INT AUTO_INCREMENT PRIMARY KEY,

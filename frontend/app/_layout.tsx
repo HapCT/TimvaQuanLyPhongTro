@@ -1,11 +1,32 @@
 import CustomAlert, { customAlertRef } from '@/components/CustomAlert';
 import { firebaseAuth } from '@/services/firebase';
-import { signOut } from 'firebase/auth';
 import { Stack, router, usePathname, useRootNavigationState } from 'expo-router';
+import { signOut } from 'firebase/auth';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useFonts } from 'expo-font';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+
+// Bắt và bỏ qua lỗi timeout 6000ms của fontfaceobserver trên Web khi dùng tunnel/mạng chậm
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    const msg = event?.reason?.message || String(event?.reason || '');
+    if (msg.includes('6000ms timeout exceeded') || msg.includes('fontfaceobserver')) {
+      event.preventDefault();
+      console.warn('⚠️ Font loading timeout (suppressed):', msg);
+    }
+  });
+}
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    ...MaterialIcons.font,
+    ...Ionicons.font,
+    ...FontAwesome.font,
+  });
+
   const navState = useRootNavigationState();
   const pathname = usePathname();
   const pathRef = useRef(pathname);
@@ -45,7 +66,10 @@ export default function RootLayout() {
   }, [navState?.key]);
 
   return (
-    <>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
@@ -75,6 +99,6 @@ export default function RootLayout() {
       )}
 
       <CustomAlert ref={customAlertRef} />
-    </>
+    </KeyboardAvoidingView>
   );
 }

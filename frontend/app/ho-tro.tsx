@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -13,6 +13,9 @@ interface SupportRequest {
   trang_thai: 'Moi' | 'DangXuLy' | 'DaGiaiQuyet';
   phan_hoi_admin?: string | null;
   ngay_tao?: string;
+  ma_phong?: number | null;
+  ten_phong?: string | null;
+  ten_khu_tro?: string | null;
 }
 
 const STATUS_LABELS = {
@@ -22,10 +25,13 @@ const STATUS_LABELS = {
 };
 
 export default function HoTroScreen() {
+  const params = useLocalSearchParams<{ ma_phong?: string; ten_phong?: string }>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [requests, setRequests] = useState<SupportRequest[]>([]);
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(
+    params.ten_phong ? `Hỏi đáp về phòng: ${params.ten_phong}` : ''
+  );
   const [details, setDetails] = useState('');
 
   const loadRequests = useCallback(async () => {
@@ -61,7 +67,11 @@ export default function HoTroScreen() {
 
     try {
       setSubmitting(true);
-      await backendApi.post('/api/ho-tro', { tieu_de: title.trim(), noi_dung: details.trim() });
+      await backendApi.post('/api/ho-tro', {
+        tieu_de: title.trim(),
+        noi_dung: details.trim(),
+        ma_phong: params.ma_phong ? Number(params.ma_phong) : null,
+      });
       setTitle('');
       setDetails('');
       await loadRequests();
@@ -74,25 +84,35 @@ export default function HoTroScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48, backgroundColor: '#F5F7FA', minHeight: '100%' }}>
+    <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: 48, backgroundColor: '#F5F7FA', minHeight: '100%' }}>
       <View style={{ width: '100%', maxWidth: 820, alignSelf: 'center', gap: 16 }}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={{ color: '#007AFF', fontSize: 14 }}>‹ Quay lại</Text>
         </TouchableOpacity>
         <View style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 20, gap: 12 }}>
-          <Text style={{ color: '#1F2937', fontSize: 21, fontWeight: '700' }}>Gửi yêu cầu hỗ trợ</Text>
-          <Text style={{ color: '#6B7280', fontSize: 13 }}>Mô tả vấn đề bạn cần hỗ trợ. Bạn có thể xem phản hồi bên dưới.</Text>
+          <Text style={{ color: '#1F2937', fontSize: 21, fontWeight: '700' }}>Gửi yêu cầu hỗ trợ / Hỏi đáp</Text>
+          <Text style={{ color: '#6B7280', fontSize: 13 }}>Mô tả vấn đề bạn cần hỗ trợ hoặc thắc mắc về phòng trọ.</Text>
+
+          {!!params.ten_phong && (
+            <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 6, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 14 }}>🏠</Text>
+              <Text style={{ color: '#1D4ED8', fontSize: 13, fontWeight: '600' }}>
+                Đang hỏi về phòng: {params.ten_phong}
+              </Text>
+            </View>
+          )}
+
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder="Tiêu đề"
+            placeholder="Tiêu đề câu hỏi / yêu cầu"
             maxLength={200}
             style={{ height: 44, borderWidth: 1, borderColor: '#DDE1E6', borderRadius: 6, paddingHorizontal: 12 }}
           />
           <TextInput
             value={details}
             onChangeText={setDetails}
-            placeholder="Nội dung cần hỗ trợ"
+            placeholder="Nội dung cần thắc mắc hoặc hỗ trợ..."
             multiline
             style={{ minHeight: 120, borderWidth: 1, borderColor: '#DDE1E6', borderRadius: 6, padding: 12, textAlignVertical: 'top' }}
           />
@@ -117,6 +137,15 @@ export default function HoTroScreen() {
                 <Text style={{ color: '#1F2937', fontSize: 15, fontWeight: '700' }}>{request.tieu_de}</Text>
                 <Text style={{ color: '#007AFF', fontSize: 13 }}>{STATUS_LABELS[request.trang_thai]}</Text>
               </View>
+
+              {!!(request.ten_phong || request.ten_khu_tro) && (
+                <View style={{ alignSelf: 'flex-start', backgroundColor: '#F3F4F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}>
+                  <Text style={{ color: '#4B5563', fontSize: 12, fontWeight: '500' }}>
+                    🏠 {request.ten_phong ? `Phòng: ${request.ten_phong}` : ''} {request.ten_khu_tro ? `(${request.ten_khu_tro})` : ''}
+                  </Text>
+                </View>
+              )}
+
               <Text style={{ color: '#4B5563', fontSize: 14 }}>{request.noi_dung}</Text>
               {!!request.phan_hoi_admin && (
                 <View style={{ backgroundColor: '#F3F7FC', borderRadius: 6, padding: 12, gap: 4 }}>

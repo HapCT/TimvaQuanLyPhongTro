@@ -17,7 +17,7 @@ import { backendApi } from '@/services/backend';
 import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/auth/login.styles';
 import { router } from 'expo-router';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -143,9 +143,26 @@ export default function LoginScreen() {
     } catch (error: any) {
       console.log('LOGIN CATCH ERROR:', error);
       await signOut(firebaseAuth).catch(() => undefined);
-      setErrorMessage(error?.code === 'auth/invalid-credential'
-        ? 'Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!'
-        : error?.response?.data?.error || error?.message || 'Có lỗi xảy ra trong quá trình đăng nhập. Vui lòng thử lại.');
+
+      let msg = error?.response?.data?.error || error?.message || '';
+      if (
+        error?.code === 'auth/invalid-credential' ||
+        error?.code === 'auth/user-not-found' ||
+        error?.code === 'auth/wrong-password'
+      ) {
+        msg = 'Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!';
+      } else if (
+        msg.includes('Network Error') ||
+        msg.includes('503') ||
+        error?.code === 'ERR_NETWORK' ||
+        error?.message?.includes('status code 503')
+      ) {
+        msg = 'Không kết nối được tới Backend Server (Cổng 3000). Vui lòng chạy command "npm start" trong thư mục backend!';
+      } else if (!msg) {
+        msg = 'Có lỗi xảy ra trong quá trình đăng nhập. Vui lòng thử lại.';
+      }
+
+      setErrorMessage(msg);
       setLoading(false);
     }
   };
@@ -168,17 +185,14 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={
-        Platform.OS === 'ios'
-          ? 'padding'
-          : undefined
-      }
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={
           styles.scrollContainer
         }
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.box}>

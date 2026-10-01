@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     Text,
     TextInput,
@@ -201,7 +203,7 @@ export default function KhuTroFormModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.card}>
           {/* HEADER */}
           <View style={styles.header}>
@@ -212,7 +214,7 @@ export default function KhuTroFormModal({
           </View>
 
           {/* BODY */}
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
 
             {isAdmin && !isEdit && (
               <View style={styles.fieldGroup}>
@@ -394,7 +396,7 @@ export default function KhuTroFormModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

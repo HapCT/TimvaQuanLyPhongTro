@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { notifyUser } = require('../services/notifications');
+const { getRoomOccupancy, getRoomOccupancyMap } = require('../services/roomOccupancy');
 
 const PHONG_FIELDS = [
   'so_phong', 'tieu_de', 'tang', 'dien_tich', 'gia_thue', 'tien_coc',
@@ -65,6 +66,7 @@ const getAll = async (req, res) => {
     const [khuTroData] = await pool.query('SELECT * FROM khu_tro');
     const [anhData] = await pool.query('SELECT * FROM anh_phong');
     const [ptiData] = await pool.query('SELECT * FROM phong_tien_ich');
+    const occupancyByRoom = await getRoomOccupancyMap(pool);
     const [tienIchData] = await pool.query('SELECT * FROM tien_ich');
 
     const chuTroIds = [...new Set(khuTroData.map((k) => k.ma_chu_tro).filter(Boolean))];
@@ -103,9 +105,14 @@ const getAll = async (req, res) => {
         a.la_anh_dai_dien === b.la_anh_dai_dien ? 0 : a.la_anh_dai_dien ? -1 : 1
       );
       const anhDaiDien = danhSachAnh[0]?.duong_dan_anh || null;
+      const soNguoiDangO = occupancyByRoom.get(Number(p.ma_phong)) || 0;
+      const soChoConLai = Math.max(0, Number(p.so_nguoi_toi_da || 1) - soNguoiDangO);
 
       return {
         ...p,
+        so_nguoi_dang_o: soNguoiDangO,
+        so_cho_con_lai: soChoConLai,
+        co_the_dat_thue: p.trang_thai !== 'BaoTri' && soChoConLai > 0,
         khu_tro: khuTro,
         ten_chu_tro: khuTro ? chuTroMap[khuTro.ma_chu_tro] || null : null,
         anh_dai_dien: anhDaiDien,
@@ -114,7 +121,12 @@ const getAll = async (req, res) => {
       };
     });
 
-    const visible = merged.filter((p) => canView(p, p.khu_tro, req.user));
+    const visible = merged.filter((p) => (
+      canView(p, p.khu_tro, req.user)
+      && (req.user?.role === 'QuanTri'
+        || (p.khu_tro?.ma_chu_tro === req.user?.id)
+        || (p.trang_thai !== 'BaoTri' && p.so_cho_con_lai > 0))
+    ));
 
     res.json({ rooms: visible, khuTroList: khuTroData, tienIchList: tienIchData });
   } catch (error) {
@@ -472,6 +484,9 @@ const getById = async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy phòng trọ' });
     }
 
+    const soNguoiDangO = await getRoomOccupancy(pool, id);
+    const soChoConLai = Math.max(0, Number(phong.so_nguoi_toi_da || 1) - soNguoiDangO);
+
     const [anhData] = await pool.query('SELECT * FROM anh_phong WHERE ma_phong = ?', [id]);
     const danhSachAnh = anhData.sort((a, b) =>
       a.la_anh_dai_dien === b.la_anh_dai_dien ? 0 : a.la_anh_dai_dien ? -1 : 1
@@ -491,6 +506,9 @@ const getById = async (req, res) => {
     res.json({
       room: {
         ...phong,
+        so_nguoi_dang_o: soNguoiDangO,
+        so_cho_con_lai: soChoConLai,
+        co_the_dat_thue: phong.trang_thai !== 'BaoTri' && soChoConLai > 0,
         khu_tro: khuTro,
         ten_chu_tro: tenChuTro || 'Chủ nhà trọ',
         so_dien_thoai_chu_tro: soDienThoaiChuTro || '0901234567',

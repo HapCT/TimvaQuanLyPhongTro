@@ -1,6 +1,6 @@
 import React, {
-  useEffect,
-  useState,
+    useEffect,
+    useState,
 } from 'react';
 
 import BookingManagement from '@/components/admin/BookingManagement';
@@ -21,12 +21,12 @@ import { showAlert } from '@/utils/alert';
 import { router, useRootNavigationState } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    ActivityIndicator,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
 export default function AdminScreen() {
@@ -261,13 +261,6 @@ export default function AdminScreen() {
               onPress={() => setMenu('appointments')}
             >
               <Text style={[styles.menuText, menu === 'appointments' && styles.menuTextActive]}>Lịch xem phòng</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.menuItem, menu === 'notifications' && styles.menuItemActive]}
-              onPress={() => setMenu('notifications')}
-            >
-              <Text style={[styles.menuText, menu === 'notifications' && styles.menuTextActive]}>Thông báo</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -516,9 +509,6 @@ export default function AdminScreen() {
 
                   {menu === 'appointments' &&
                     'Quản lý lịch hẹn xem phòng'}
-
-                  {menu === 'notifications' &&
-                    'Thông báo'}
 
                   {menu === 'reviews' &&
                     'Quản lý đánh giá'}

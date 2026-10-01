@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { notifyUser } = require('../services/notifications');
+const { getRoomOccupancyMap } = require('../services/roomOccupancy');
 
 const parseDate = (value) => {
   const text = String(value || '').trim();
@@ -49,10 +50,12 @@ const checkInvoiceAccess = (req, res, invoice) => {
 const getAll = async (req, res) => {
   try {
     let sql = `
-      SELECT hd.*, h.ma_nguoi_thue, k.ma_chu_tro,
+      SELECT hd.*, h.ma_nguoi_thue, h.ma_phong, k.ma_chu_tro,
              nd.ho_ten AS nguoi_thue_ho_ten,
              p.tieu_de AS phong_tieu_de, p.so_phong AS phong_so_phong,
-             k.ten_khu_tro,
+             p.dien_tich AS phong_dien_tich, p.tang AS phong_tang,
+             p.so_nguoi_toi_da AS phong_so_nguoi_toi_da, p.trang_thai AS phong_trang_thai,
+             k.ten_khu_tro, k.dia_chi, k.phuong, k.quan_huyen, k.thanh_pho,
              COALESCE(tt.da_thanh_toan, 0) AS da_thanh_toan,
              COALESCE(tt.cho_xac_nhan, 0) AS cho_xac_nhan,
              (hd.han_thanh_toan < CURDATE()) AS qua_han
@@ -79,6 +82,7 @@ const getAll = async (req, res) => {
 
     const [rows] = await pool.query(sql, params);
     if (rows.length === 0) return res.json([]);
+    const occupancyByRoom = await getRoomOccupancyMap(pool);
 
     const invoiceIds = rows.map((row) => row.ma_hoa_don);
     const [payments] = await pool.query(
@@ -118,7 +122,15 @@ const getAll = async (req, res) => {
           ma_nguoi_thue: row.ma_nguoi_thue,
           nguoi_thue: row.nguoi_thue_ho_ten,
           phong: row.phong_tieu_de || `Phòng ${row.phong_so_phong || ''}`,
+          so_phong: row.phong_so_phong,
           ten_khu_tro: row.ten_khu_tro,
+          dia_chi: [row.dia_chi, row.phuong, row.quan_huyen, row.thanh_pho].filter(Boolean).join(', '),
+          dien_tich: row.phong_dien_tich,
+          tang: row.phong_tang,
+          trang_thai: row.phong_trang_thai,
+          so_nguoi_dang_o: occupancyByRoom.get(Number(row.ma_phong)) || 0,
+          so_nguoi_toi_da: Number(row.phong_so_nguoi_toi_da || 1),
+          so_cho_con_lai: Math.max(0, Number(row.phong_so_nguoi_toi_da || 1) - (occupancyByRoom.get(Number(row.ma_phong)) || 0)),
         },
         thanh_toan: paymentsByInvoice[row.ma_hoa_don] || [],
       };

@@ -1,8 +1,8 @@
-import { formatNumber } from '@/utils/format';
 import { useFavorites } from '@/hooks/use-favorites';
 import { backendApi } from '@/services/backend';
 import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/home.styles';
+import { formatNumber } from '@/utils/format';
 import { router } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
@@ -107,11 +107,11 @@ export default function HomeScreen() {
   };
 
   // =============================================
-  // TÌM KIẾM (chỉ hiển thị phòng ConTrong – ẩn DaThue)
+  // Ẩn phòng đang bảo trì hoặc đã hết sức chứa.
   // =============================================
   const filteredRooms = rooms.filter((room) => {
-    // Ẩn phòng đã cho thuê khỏi trang người thuê
-    if (room.trang_thai === 'DaThue') return false;
+    const availableSeats = Number(room.so_cho_con_lai ?? (room.trang_thai === 'ConTrong' ? room.so_nguoi_toi_da ?? 1 : 0));
+    if (room.trang_thai === 'BaoTri' || availableSeats <= 0) return false;
     const keyword = search.trim().toLowerCase();
     if (!keyword) return true;
     return (
@@ -126,6 +126,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: isMobile ? 15 : 30 },
@@ -315,10 +316,10 @@ export default function HomeScreen() {
                       style={[styles.roomImage, { height: isMobile ? 200 : 190 }]}
                     />
                     <View style={[styles.badge, {
-                      backgroundColor: room.trang_thai === 'ConTrong' ? '#34C759' : '#FF3B30',
+                      backgroundColor: Number(room.so_nguoi_dang_o || 0) > 0 ? '#D97706' : '#34C759',
                     }]}>
                       <Text style={styles.badgeText}>
-                        {room.trang_thai === 'ConTrong' ? 'Còn trống' : 'Đã thuê'}
+                        {Number(room.so_nguoi_dang_o || 0) > 0 ? `Còn ${room.so_cho_con_lai} chỗ` : 'Còn trống'}
                       </Text>
                     </View>
                     <TouchableOpacity

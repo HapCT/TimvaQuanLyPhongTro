@@ -14,3 +14,26 @@ export function formatNumber(value: unknown): string {
 export function formatVND(value: unknown): string {
   return `${formatNumber(value)} đ`;
 }
+
+/**
+ * Dùng cho TextInput nhập tiền — tự thêm dấu chấm ngăn cách khi gõ.
+ * Nhận chuỗi thô người dùng gõ, trả về chuỗi đã format.
+ * Ví dụ: "3000000" -> "3.000.000"
+ */
+export function formatMoneyInput(raw: string): string {
+  // Chỉ giữ lại chữ số
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  // Thêm dấu chấm mỗi 3 chữ số từ phải sang
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/**
+ * Chuyển chuỗi đã format ("3.000.000") về số nguyên (3000000) để submit.
+ */
+export function parseMoneyInput(formatted: string): number {
+  const digits = formatted.replace(/\./g, '').replace(/\D/g, '');
+  const n = parseInt(digits, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+

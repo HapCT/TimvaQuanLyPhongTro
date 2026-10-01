@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
     Modal,
     Platform,
     ScrollView,
@@ -167,6 +168,7 @@ export default function ProfileScreen() {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.centerWrapper}>
@@ -226,6 +228,7 @@ export default function ProfileScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
+      automaticallyAdjustKeyboardInsets
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.centerWrapper}>
@@ -443,6 +446,7 @@ export default function ProfileScreen() {
         <Text style={styles.footerNote}>© 2026 Hệ thống Quản lý và Tìm kiếm Phòng trọ</Text>
       </View>
       <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 10, padding: 20, gap: 12 }}>
             <Text style={{ color: '#111827', fontSize: 18, fontWeight: '700' }}>Sửa thông tin cá nhân</Text>
@@ -471,6 +475,7 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );

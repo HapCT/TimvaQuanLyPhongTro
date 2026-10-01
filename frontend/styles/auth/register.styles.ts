@@ -5,7 +5,9 @@ export const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 100,
     backgroundColor: '#f5f7fb',
   },
 

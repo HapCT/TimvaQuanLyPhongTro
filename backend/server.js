@@ -15,6 +15,11 @@ const hoaDonRoutes = require('./routes/hoaDonRoutes');
 const thongBaoRoutes = require('./routes/thongBaoRoutes');
 const yeuThichRoutes = require('./routes/yeuThichRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const anhPhongRoutes = require('./routes/anhPhongRoutes');
+const phongTienIchRoutes = require('./routes/phongTienIchRoutes');
+const hoSoPhapLyRoutes = require('./routes/hoSoPhapLyRoutes');
+const thanhToanRoutes = require('./routes/thanhToanRoutes');
+const thanhToanHoaDonRoutes = require('./routes/thanhToanHoaDonRoutes');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -37,6 +42,11 @@ app.use('/api/hoa-don', hoaDonRoutes);
 app.use('/api/thong-bao', thongBaoRoutes);
 app.use('/api/yeu-thich', yeuThichRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/anh-phong', anhPhongRoutes);
+app.use('/api/phong-tien-ich', phongTienIchRoutes);
+app.use('/api/ho-so-phap-ly', hoSoPhapLyRoutes);
+app.use('/api/thanh-toan', thanhToanRoutes);
+app.use('/api/thanh-toan-hoa-don', thanhToanHoaDonRoutes);
 
 // Route mặc định kiểm tra health
 app.get('/', (req, res) => {

@@ -1,14 +1,15 @@
-import { formatNumber } from '@/utils/format';
 import Pagination, { ADMIN_PAGE_SIZE } from '@/components/admin/Pagination';
 import { backendApi } from '@/services/backend';
 import { firebaseAuth } from '@/services/firebase';
 import { styles } from '@/styles/admin/rooms-management.styles';
 import { showAlert } from '@/utils/alert';
+import { formatNumber } from '@/utils/format';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     Image,
+    KeyboardAvoidingView,
     Modal,
     Platform,
     ScrollView,
@@ -411,6 +412,7 @@ export default function RoomReviewManagement() {
 
       {/* MODAL TỪ CHỐI BÀI ĐĂNG */}
       <Modal visible={rejectModalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ backgroundColor: '#FFF', width: '100%', maxWidth: 450, borderRadius: 12, padding: 20, gap: 16 }}>
             <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Từ chối bài đăng phòng trọ</Text>
@@ -449,6 +451,7 @@ export default function RoomReviewManagement() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* MODAL PREVIEW ẢNH PHÓNG TO */}

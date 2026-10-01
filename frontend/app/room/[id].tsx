@@ -5,19 +5,20 @@ import { formatNumber } from '@/utils/format';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Linking,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Linking,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
 // Map icon gợi ý cho các tiện ích thông dụng
@@ -148,13 +149,24 @@ export default function RoomDetailScreen() {
       d.setDate(d.getDate() + 7);
       setRentDate(d.toISOString().split('T')[0]);
     }
+    const availablePeople = Number(room?.so_cho_con_lai ?? (room?.trang_thai === 'ConTrong' ? room?.so_nguoi_toi_da ?? 1 : 0));
+    if (availablePeople < 1) {
+      notify('Đã đủ người', 'Phòng này hiện không còn chỗ trống.');
+      return;
+    }
+    setRentPeople('1');
     setRentModalVisible(true);
   };
 
   const handleSubmitRent = async () => {
     const people = Number(rentPeople);
+    const maxPeople = Number(room?.so_cho_con_lai ?? (room?.trang_thai === 'ConTrong' ? room?.so_nguoi_toi_da ?? 1 : 0));
     if (!Number.isInteger(people) || people < 1) {
       notify('Thông báo', 'Số người thuê phải là số nguyên lớn hơn 0.');
+      return;
+    }
+    if (people > maxPeople) {
+      notify('Vượt sức chứa', `Phòng này chỉ cho phép tối đa ${maxPeople} người.`);
       return;
     }
     if (rentDate.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(rentDate.trim())) {
@@ -335,6 +347,15 @@ export default function RoomDetailScreen() {
 
   const formattedPrice = room.gia_thue ? formatNumber(room.gia_thue) : '0';
   const formattedDeposit = room.tien_coc ? formatNumber(room.tien_coc) : formattedPrice;
+  const roomCapacity = Number(room.so_nguoi_toi_da || 1);
+  const currentOccupants = Number(room.so_nguoi_dang_o || 0);
+  const availablePeople = Number(room.so_cho_con_lai ?? (room.trang_thai === 'ConTrong' ? roomCapacity : 0));
+  const canRentRoom = room.trang_thai !== 'BaoTri' && availablePeople > 0;
+  const availabilityLabel = availablePeople === 0
+    ? 'Đã đủ người'
+    : currentOccupants > 0
+      ? `Còn ${availablePeople}/${roomCapacity} chỗ`
+      : 'Còn trống';
 
   return (
     <View style={styles.container}>
@@ -402,11 +423,11 @@ export default function RoomDetailScreen() {
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: room.trang_thai === 'ConTrong' ? '#34C759' : '#FF3B30' },
+                { backgroundColor: availablePeople > 0 ? (currentOccupants > 0 ? '#D97706' : '#34C759') : '#FF3B30' },
               ]}
             >
               <Text style={styles.statusBadgeText}>
-                {room.trang_thai === 'ConTrong' ? 'Còn trống' : 'Đã cho thuê'}
+                {availabilityLabel}
               </Text>
             </View>
           </View>
@@ -531,7 +552,7 @@ export default function RoomDetailScreen() {
               )}
 
               {userRole === 'NguoiThue' && (myBookingStatus === 'DaDuyet' || hasViewed) && hasReviewed && (
-                <Text style={{ marginTop: 14, color: '#15803D', fontSize: 13 }}>Bạn đã đánh giá phòng này. Xem/xóa tại "Đánh giá của tôi".</Text>
+                <Text style={{ marginTop: 14, color: '#15803D', fontSize: 13 }}>Bạn đã đánh giá phòng này. Xem/xóa tại &quot;Đánh giá của tôi&quot;.</Text>
               )}
 
               {userRole === 'NguoiThue' && (myBookingStatus === 'DaDuyet' || hasViewed) && !hasReviewed && (
@@ -594,8 +615,28 @@ export default function RoomDetailScreen() {
               <Text style={styles.callBtnText}>Gọi điện</Text>
             </TouchableOpacity>
 
+            {/* NÚT HỎI ĐÁP VỀ PHÒNG NÀY */}
+            <TouchableOpacity
+              style={{
+                height: 48,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                backgroundColor: '#EFF6FF',
+                borderWidth: 1,
+                borderColor: '#BFDBFE',
+                justifyContent: 'center',
+                alignItems: 'center',
+                flexDirection: 'row',
+                gap: 6,
+              }}
+              onPress={() => router.push(`/ho-tro?ma_phong=${id}&ten_phong=${encodeURIComponent(room.ten_phong)}` as any)}
+            >
+              <Text style={{ fontSize: 16 }}>💬</Text>
+              <Text style={{ color: '#1D4ED8', fontSize: 14, fontWeight: '600' }}>Hỏi về phòng này</Text>
+            </TouchableOpacity>
+
             {/* NÚT YÊU CẦU THUÊ PHÒNG */}
-            {room.trang_thai === 'ConTrong' && myBookingStatus !== 'DaDuyet' && (
+            {canRentRoom && myBookingStatus !== 'DaDuyet' && (
               <TouchableOpacity
                 style={[styles.rentBtn, myBookingStatus === 'ChoDuyet' && { opacity: 0.6 }]}
                 onPress={handleOpenRentModal}
@@ -616,6 +657,7 @@ export default function RoomDetailScreen() {
 
       {/* MODAL YÊU CẦU THUÊ PHÒNG */}
       <Modal visible={rentModalVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
@@ -631,8 +673,21 @@ export default function RoomDetailScreen() {
             <Text style={styles.inputLabel}>Ngày dự kiến nhận phòng (YYYY-MM-DD)</Text>
             <TextInput style={styles.inputField} placeholder="2026-10-15" value={rentDate} onChangeText={setRentDate} />
 
-            <Text style={styles.inputLabel}>Số người ở *</Text>
-            <TextInput style={styles.inputField} keyboardType="number-pad" value={rentPeople} onChangeText={setRentPeople} />
+            <Text style={styles.inputLabel}>Số người ở * · còn {availablePeople} chỗ</Text>
+            <TextInput
+              style={styles.inputField}
+              keyboardType="number-pad"
+              value={rentPeople}
+              maxLength={String(availablePeople).length}
+              onChangeText={(value) => {
+                const digits = value.replace(/\D/g, '');
+                if (!digits) {
+                  setRentPeople('');
+                  return;
+                }
+                setRentPeople(String(Math.min(Number(digits), availablePeople)));
+              }}
+            />
 
             <Text style={styles.inputLabel}>Ghi chú cho chủ trọ</Text>
             <TextInput
@@ -653,10 +708,12 @@ export default function RoomDetailScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* MODAL ĐẶT LỊCH HẸN XEM PHÒNG */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
@@ -670,7 +727,7 @@ export default function RoomDetailScreen() {
               Phòng: {room.tieu_de || `Phòng ${room.so_phong}`}
             </Text>
 
-            <ScrollView style={{ maxHeight: 380 }}>
+            <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
               <Text style={styles.inputLabel}>Họ và tên người hẹn *</Text>
               <TextInput
                 style={styles.inputField}
@@ -742,6 +799,7 @@ export default function RoomDetailScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

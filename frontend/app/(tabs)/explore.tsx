@@ -95,8 +95,9 @@ export default function ExploreScreen() {
     const keyword = search.trim().toLowerCase();
 
     let list = rooms.filter((room) => {
-      // Ẩn phòng đã cho thuê khỏi danh sách người thuê (trừ khi chủ động lọc DaThue)
-      if (selectedStatus === 'ALL' && room.trang_thai === 'DaThue') return false;
+      const occupiedSeats = Number(room.so_nguoi_dang_o || 0);
+      const availableSeats = Number(room.so_cho_con_lai ?? (room.trang_thai === 'ConTrong' ? room.so_nguoi_toi_da ?? 1 : 0));
+      if (room.trang_thai === 'BaoTri' || availableSeats <= 0) return false;
       // Lọc từ khóa
       const matchKeyword =
         !keyword ||
@@ -114,8 +115,9 @@ export default function ExploreScreen() {
       const matchKhu = !selectedKhuTro || room.ma_khu_tro === selectedKhuTro;
 
       // Lọc trạng thái
-      const matchStatus =
-        selectedStatus === 'ALL' || room.trang_thai === selectedStatus;
+      const matchStatus = selectedStatus === 'ALL'
+        || (selectedStatus === 'ConTrong' && occupiedSeats === 0)
+        || (selectedStatus === 'DaThue' && occupiedSeats > 0);
 
       return matchKeyword && matchPrice && matchKhu && matchStatus;
     });
@@ -136,6 +138,7 @@ export default function ExploreScreen() {
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={[
           styles.scrollContent,
           { paddingHorizontal: isMobile ? 15 : 30 },
@@ -341,13 +344,12 @@ export default function ExploreScreen() {
                       style={[
                         styles.badge,
                         {
-                          backgroundColor:
-                            room.trang_thai === 'ConTrong' ? '#34C759' : '#FF3B30',
+                          backgroundColor: Number(room.so_nguoi_dang_o || 0) > 0 ? '#D97706' : '#34C759',
                         },
                       ]}
                     >
                       <Text style={styles.badgeText}>
-                        {room.trang_thai === 'ConTrong' ? 'Còn trống' : 'Đã thuê'}
+                        {Number(room.so_nguoi_dang_o || 0) > 0 ? `Còn ${room.so_cho_con_lai} chỗ` : 'Còn trống'}
                       </Text>
                     </View>
 

@@ -9,6 +9,7 @@
     "migrate:admin-workflows": "node scripts/migrateAdminWorkflows.js",
     "migrate:billing": "node scripts/migrateBilling.js",
     "migrate:notifications": "node scripts/migrateNotifications.js",
+    "migrate:contract-approval": "node scripts/migrateContractApproval.js",
     "migrate:notifications": "node scripts/migrateNotifications.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

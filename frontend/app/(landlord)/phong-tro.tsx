@@ -1,4 +1,4 @@
-import { formatNumber } from '@/utils/format';
+import { formatMoneyInput, formatNumber, parseMoneyInput } from '@/utils/format';
 // Trang quản lý phòng trọ dành riêng cho Chủ Trọ
 import { backendApi } from '@/services/backend';
 import { firebaseAuth } from '@/services/firebase';
@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     Alert,
     Image,
+    KeyboardAvoidingView,
     Modal,
     Platform,
     ScrollView,
@@ -289,8 +290,8 @@ export default function LandlordRoomsScreen() {
       setFormSoPhong(room.so_phong || '');
       setFormTang(String(room.tang || '1'));
       setFormSoNguoiToiDa(String(room.so_nguoi_toi_da || '2'));
-      setFormGiaThue(String(room.gia_thue || ''));
-      setFormTienCoc(String(room.tien_coc || ''));
+      setFormGiaThue(room.gia_thue ? formatMoneyInput(String(room.gia_thue)) : '');
+      setFormTienCoc(room.tien_coc ? formatMoneyInput(String(room.tien_coc)) : '');
       setFormDienTich(String(room.dien_tich || ''));
       setFormTrangThai(room.trang_thai === 'DaThue' ? 'DaThue' : 'ConTrong');
       setFormMaKhuTro(String(room.ma_khu_tro || ''));
@@ -374,8 +375,8 @@ export default function LandlordRoomsScreen() {
         tieu_de: formTieuDe.trim() || `Phòng ${formSoPhong.trim()}`,
         tang: parseInt(formTang) || 1,
         so_nguoi_toi_da: parseInt(formSoNguoiToiDa) || 2,
-        gia_thue: parseFloat(formGiaThue) || 0,
-        tien_coc: parseFloat(formTienCoc) || parseFloat(formGiaThue) || 0,
+        gia_thue: parseMoneyInput(formGiaThue) || 0,
+        tien_coc: parseMoneyInput(formTienCoc) || parseMoneyInput(formGiaThue) || 0,
         dien_tich: parseFloat(formDienTich) || 0,
         trang_thai: formTrangThai,
         ma_khu_tro: formMaKhuTro,
@@ -457,7 +458,7 @@ export default function LandlordRoomsScreen() {
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
+    <ScrollView showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContainer}>
       <View style={[styles.mainContent, { maxWidth: isDesktop ? 1250 : '100%' }]}>
 
         {/* THÔNG BÁO PHÒNG BỊ TỪ CHỐI */}
@@ -561,6 +562,10 @@ export default function LandlordRoomsScreen() {
           <View style={styles.roomGrid}>
             {displayedRooms.map((room) => {
               const isConTrong = room.trang_thai === 'ConTrong' || room.trang_thai === 'Trong';
+              const soNguoiDangO = Number(room.so_nguoi_dang_o || 0);
+              const sucChua = Number(room.so_nguoi_toi_da || 1);
+              const choConLai = Number(room.so_cho_con_lai ?? Math.max(0, sucChua - soNguoiDangO));
+              const coTheDoiTrangThai = soNguoiDangO === 0 && room.trang_thai !== 'BaoTri';
               return (
                 <View
                   key={room.ma_phong}
@@ -584,12 +589,19 @@ export default function LandlordRoomsScreen() {
                   <TouchableOpacity
                     style={[
                       styles.toggleStatusBadge,
-                      { backgroundColor: isConTrong ? '#34C759' : '#FF3B30' },
+                      { backgroundColor: room.trang_thai === 'BaoTri' ? '#6B7280' : choConLai > 0 ? (soNguoiDangO > 0 ? '#D97706' : '#34C759') : '#FF3B30' },
                     ]}
                     onPress={() => handleToggleStatus(room)}
+                    disabled={!coTheDoiTrangThai}
                   >
                     <Text style={styles.toggleStatusText}>
-                      {isConTrong ? '🟢 Còn trống (Bấm đổi)' : '🔴 Đã cho thuê (Bấm đổi)'}
+                      {room.trang_thai === 'BaoTri'
+                        ? '⚪ Đang bảo trì'
+                        : soNguoiDangO > 0
+                          ? `🟠 Đã ở/giữ chỗ ${soNguoiDangO}/${sucChua} · còn ${choConLai}`
+                          : choConLai > 0
+                            ? `${isConTrong ? '🟢 Còn trống' : '🔴 Chưa mở cho thuê'} (Bấm đổi)`
+                            : `🔴 Đã đủ người (${soNguoiDangO}/${sucChua})`}
                     </Text>
                   </TouchableOpacity>
 
@@ -650,6 +662,7 @@ export default function LandlordRoomsScreen() {
 
       {/* MODAL THÊM / SỬA PHÒNG TRỌ */}
       <Modal visible={formVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -661,7 +674,7 @@ export default function LandlordRoomsScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 460 }}>
+            <ScrollView style={{ maxHeight: 460 }} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
               <Text style={styles.label}>Chọn khu trọ *</Text>
               <View style={styles.khuPickerRow}>
                 {myKhuTroList.map((k) => (
@@ -715,7 +728,7 @@ export default function LandlordRoomsScreen() {
                     placeholder="2500000"
                     keyboardType="numeric"
                     value={formGiaThue}
-                    onChangeText={setFormGiaThue}
+                    onChangeText={(v) => setFormGiaThue(formatMoneyInput(v))}
                   />
                 </View>
 
@@ -726,7 +739,7 @@ export default function LandlordRoomsScreen() {
                     placeholder="2500000"
                     keyboardType="numeric"
                     value={formTienCoc}
-                    onChangeText={setFormTienCoc}
+                    onChangeText={(v) => setFormTienCoc(formatMoneyInput(v))}
                   />
                 </View>
               </View>
@@ -968,12 +981,14 @@ export default function LandlordRoomsScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ============================================ */}
       {/* MODAL YÊU CẦU PHÁP LÝ + PHÍ ĐĂNG BÀI       */}
       {/* ============================================ */}
       <Modal visible={legalModalVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '92%' }]}>
             {/* HEADER */}
@@ -984,7 +999,7 @@ export default function LandlordRoomsScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: 500 }} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
               {/* MÔ TẢ CHÍNH SÁCH */}
               <View style={{
@@ -1203,6 +1218,7 @@ export default function LandlordRoomsScreen() {
 
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
     </ScrollView>

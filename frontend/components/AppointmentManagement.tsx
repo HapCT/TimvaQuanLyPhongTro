@@ -20,6 +20,8 @@ type Appointment = {
     tieu_de?: string;
     so_phong?: string;
     trang_thai?: string;
+    so_cho_con_lai?: number;
+    co_the_dat_thue?: boolean;
     ten_khu_tro?: string;
     dia_chi?: string;
   };
@@ -153,7 +155,10 @@ export default function AppointmentManagement({ tenantView = false }: { tenantVi
         <View style={{ backgroundColor: '#FFFFFF', borderRadius: 8, padding: 24, alignItems: 'center' }}>
           <Text style={{ color: '#6B7280' }}>Chưa có lịch hẹn ở trạng thái này.</Text>
         </View>
-      ) : visibleAppointments.map((appointment) => (
+      ) : visibleAppointments.map((appointment) => {
+        const canRentRoom = appointment.phong_tro?.co_the_dat_thue
+          ?? appointment.phong_tro?.trang_thai === 'ConTrong';
+        return (
         <View key={appointment.ma_dat_lich} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, gap: 8 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
             <Text style={{ color: '#111827', fontSize: 15, fontWeight: '700', flex: 1 }}>
@@ -226,18 +231,21 @@ export default function AppointmentManagement({ tenantView = false }: { tenantVi
               <Text style={{ color: '#1E40AF', fontSize: 13, lineHeight: 19 }}>
                 Bạn đã xem phòng này. Bạn thấy phòng thế nào?
               </Text>
+              {!canRentRoom && (
+                <Text style={{ color: '#B45309', fontSize: 13, lineHeight: 19 }}>
+                  Phòng đã đủ người, hiện không còn chỗ để thuê chung.
+                </Text>
+              )}
               <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                {appointment.phong_tro?.trang_thai === 'ConTrong' ? (
+                {canRentRoom && (
                   <TouchableOpacity onPress={() => goToRoom(appointment.ma_phong)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, backgroundColor: '#2563EB' }}>
                     <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>Thuê phòng này</Text>
                   </TouchableOpacity>
-                ) : (
-                  <Text style={{ color: '#B45309', fontSize: 13, alignSelf: 'center' }}>Phòng hiện không còn trống.</Text>
                 )}
                 <TouchableOpacity onPress={() => goToRoom(appointment.ma_phong)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#BFDBFE' }}>
                   <Text style={{ color: '#1D4ED8', fontSize: 13 }}>Viết đánh giá</Text>
                 </TouchableOpacity>
-                {appointment.phong_tro?.trang_thai === 'ConTrong' && (
+                {canRentRoom && (
                   <TouchableOpacity onPress={() => goToRoom(appointment.ma_phong)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#BFDBFE' }}>
                     <Text style={{ color: '#1D4ED8', fontSize: 13 }}>Đặt lịch xem lại</Text>
                   </TouchableOpacity>
@@ -263,7 +271,8 @@ export default function AppointmentManagement({ tenantView = false }: { tenantVi
             </View>
           )}
         </View>
-      ))}
+        );
+      })}
     </View>
   );
 }

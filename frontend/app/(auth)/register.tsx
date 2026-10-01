@@ -2,13 +2,15 @@
 import React, { useState } from 'react';
 
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { backendApi } from '@/services/backend';
@@ -231,11 +233,16 @@ export default function RegisterScreen() {
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.card}>
 
         <Text style={styles.title}>
@@ -406,7 +413,8 @@ export default function RegisterScreen() {
 
       </View>
     </ScrollView>
-  );
+  </KeyboardAvoidingView>
+);
 }
 
 

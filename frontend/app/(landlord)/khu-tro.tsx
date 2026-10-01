@@ -1,21 +1,22 @@
 // Màn hình Quản lý Khu trọ của Chủ Trọ
+import { backendApi } from '@/services/backend';
+import { firebaseAuth } from '@/services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
   ActivityIndicator,
-  ScrollView,
-  useWindowDimensions,
-  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
-  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
-import { firebaseAuth } from '@/services/firebase';
-import { backendApi } from '@/services/backend';
-import { onAuthStateChanged } from 'firebase/auth';
 
 export default function LandlordKhuTroScreen() {
   const { width } = useWindowDimensions();
@@ -157,7 +158,7 @@ export default function LandlordKhuTroScreen() {
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
+    <ScrollView showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={styles.container}>
       <View style={[styles.mainContent, { maxWidth: isDesktop ? 1250 : '100%' }]}>
 
         {/* HEADER BAR */}
@@ -225,6 +226,7 @@ export default function LandlordKhuTroScreen() {
 
       {/* MODAL FORM KHU TRỌ */}
       <Modal visible={formVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -236,7 +238,7 @@ export default function LandlordKhuTroScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 400 }}>
+            <ScrollView style={{ maxHeight: 400 }} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
               <Text style={styles.label}>Tên khu trọ *</Text>
               <TextInput
                 style={styles.input}
@@ -339,6 +341,7 @@ export default function LandlordKhuTroScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );

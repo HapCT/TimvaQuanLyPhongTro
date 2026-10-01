@@ -15,6 +15,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#94A3B8',
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
           height: 60,
           paddingBottom: 8,

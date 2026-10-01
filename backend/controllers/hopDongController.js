@@ -1,11 +1,13 @@
 const pool = require('../config/db');
 const { notifyUser } = require('../services/notifications');
+const { getRoomOccupancy, getRoomOccupancyMap } = require('../services/roomOccupancy');
 
 const getAll = async (req, res) => {
   try {
     let sql = `
-      SELECT hd.*, nd.ho_ten AS nguoi_thue_ho_ten, nd.so_dien_thoai AS nguoi_thue_so_dien_thoai,
-             p.tieu_de, p.so_phong, p.gia_thue AS gia_thue_phong, k.ten_khu_tro, k.ma_chu_tro
+            SELECT hd.*, nd.ho_ten AS nguoi_thue_ho_ten, nd.so_dien_thoai AS nguoi_thue_so_dien_thoai,
+              p.tieu_de, p.so_phong, p.dien_tich, p.tang, p.so_nguoi_toi_da, p.trang_thai AS phong_trang_thai,
+              p.gia_thue AS gia_thue_phong, k.ten_khu_tro, k.dia_chi, k.phuong, k.quan_huyen, k.thanh_pho, k.ma_chu_tro
       FROM hop_dong hd
       JOIN nguoi_dung nd ON nd.ma_nguoi_dung = hd.ma_nguoi_thue
       JOIN phong_tro p ON p.ma_phong = hd.ma_phong
@@ -23,6 +25,7 @@ const getAll = async (req, res) => {
 
     const [contracts] = await pool.query(sql, params);
     if (contracts.length === 0) return res.json([]);
+    const occupancyByRoom = await getRoomOccupancyMap(pool);
 
     const ids = contracts.map((contract) => contract.ma_hop_dong);
     const [payments] = await pool.query(
@@ -47,6 +50,13 @@ const getAll = async (req, res) => {
         so_phong: contract.so_phong,
         gia_thue: contract.gia_thue_phong,
         ten_khu_tro: contract.ten_khu_tro,
+        dia_chi: [contract.dia_chi, contract.phuong, contract.quan_huyen, contract.thanh_pho].filter(Boolean).join(', '),
+        dien_tich: contract.dien_tich,
+        tang: contract.tang,
+        trang_thai: contract.phong_trang_thai,
+        so_nguoi_dang_o: occupancyByRoom.get(Number(contract.ma_phong)) || 0,
+        so_nguoi_toi_da: Number(contract.so_nguoi_toi_da || 1),
+        so_cho_con_lai: Math.max(0, Number(contract.so_nguoi_toi_da || 1) - (occupancyByRoom.get(Number(contract.ma_phong)) || 0)),
       },
       thanh_toan: paymentsByContract[contract.ma_hop_dong] || [],
     })));
@@ -139,6 +149,7 @@ const getContractForOwner = async (req, id) => {
 };
 
 const updateStatus = async (req, res) => {
+  let connection;
   try {
     const { status } = req.body;
     if (!['DangHieuLuc', 'KetThuc', 'Huy'].includes(status)) {
@@ -147,16 +158,25 @@ const updateStatus = async (req, res) => {
     const access = await getContractForOwner(req, req.params.id);
     if (access.error) return res.status(access.status).json({ error: access.error });
 
-    await pool.query('UPDATE hop_dong SET trang_thai = ? WHERE ma_hop_dong = ?', [status, req.params.id]);
-    if (status === 'KetThuc' || status === 'Huy') {
-      const [activeContracts] = await pool.query(
-        "SELECT ma_hop_dong FROM hop_dong WHERE ma_phong = ? AND trang_thai = 'DangHieuLuc' LIMIT 1",
-        [access.contract.ma_phong]
-      );
-      if (activeContracts.length === 0) {
-        await pool.query("UPDATE phong_tro SET trang_thai = 'ConTrong' WHERE ma_phong = ?", [access.contract.ma_phong]);
-      }
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    const [roomRows] = await connection.query(
+      'SELECT trang_thai FROM phong_tro WHERE ma_phong = ? LIMIT 1 FOR UPDATE',
+      [access.contract.ma_phong]
+    );
+    if (!roomRows[0]) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Không tìm thấy phòng của hợp đồng.' });
     }
+    await connection.query('UPDATE hop_dong SET trang_thai = ? WHERE ma_hop_dong = ?', [status, req.params.id]);
+    const occupied = await getRoomOccupancy(connection, access.contract.ma_phong);
+    if (roomRows[0].trang_thai !== 'BaoTri') {
+      await connection.query(
+        'UPDATE phong_tro SET trang_thai = ? WHERE ma_phong = ?',
+        [occupied > 0 ? 'DaThue' : 'ConTrong', access.contract.ma_phong]
+      );
+    }
+    await connection.commit();
     await notifyUser({
       userId: access.contract.ma_nguoi_thue,
       title: 'Cập nhật hợp đồng',
@@ -165,7 +185,10 @@ const updateStatus = async (req, res) => {
     });
     res.json({ success: true, trang_thai: status });
   } catch (error) {
+    if (connection) await connection.rollback();
     res.status(500).json({ error: error.message });
+  } finally {
+    if (connection) connection.release();
   }
 };
 

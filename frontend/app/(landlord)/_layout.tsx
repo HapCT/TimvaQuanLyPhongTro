@@ -27,7 +27,8 @@ export default function LandlordLayout() {
   const isDatLich = pathname.includes('dat-lich');
   const isNotifications = pathname.includes('thong-bao');
   const isContracts = pathname.includes('hop-dong');
-  const isRooms = !isKhuTro && !isDatPhong && !isDatLich && !isNotifications && !isContracts;
+  const isHoTro = pathname.includes('ho-tro');
+  const isRooms = !isKhuTro && !isDatPhong && !isDatLich && !isNotifications && !isContracts && !isHoTro;
 
   let pageTitle = 'Quản lý phòng trọ';
   if (isKhuTro) {
@@ -40,6 +41,8 @@ export default function LandlordLayout() {
     pageTitle = 'Thông báo';
   } else if (isContracts) {
     pageTitle = 'Hợp đồng & Thanh toán';
+  } else if (isHoTro) {
+    pageTitle = 'Yêu cầu hỗ trợ';
   }
 
   // Cập nhật title trình duyệt khi chạy trên Web
@@ -55,10 +58,12 @@ export default function LandlordLayout() {
       document.title = 'Thông báo | Chủ trọ';
     } else if (isContracts) {
       document.title = 'Hợp đồng & Thanh toán | Chủ trọ';
+    } else if (isHoTro) {
+      document.title = 'Yêu cầu hỗ trợ | Chủ trọ';
     } else {
       document.title = 'Quản lý phòng trọ | Chủ trọ';
     }
-  }, [pathname, isKhuTro, isDatPhong, isDatLich, isNotifications, isContracts]);
+  }, [pathname, isKhuTro, isDatPhong, isDatLich, isNotifications, isContracts, isHoTro]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
@@ -233,6 +238,15 @@ export default function LandlordLayout() {
                 Hợp đồng & Thanh toán
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.mobileNavChip, isHoTro && styles.mobileNavChipActive]}
+              onPress={() => router.push('/(landlord)/ho-tro' as any)}
+            >
+              <Text style={[styles.mobileNavChipText, isHoTro && styles.mobileNavChipTextActive]}>
+                Hỗ trợ
+              </Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
 
@@ -337,6 +351,16 @@ export default function LandlordLayout() {
             ]}
           >
             Yêu cầu đặt phòng
+          </Text>
+        </TouchableOpacity>
+
+        {/* YÊU CẦU HỖ TRỢ */}
+        <TouchableOpacity
+          style={[styles.menuItem, isHoTro && styles.menuItemActive]}
+          onPress={() => router.push('/(landlord)/ho-tro' as any)}
+        >
+          <Text style={[styles.menuText, isHoTro && styles.menuTextActive]}>
+            Yêu cầu hỗ trợ
           </Text>
         </TouchableOpacity>
 

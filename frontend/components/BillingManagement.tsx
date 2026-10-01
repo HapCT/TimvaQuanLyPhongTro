@@ -1,6 +1,6 @@
-import { formatNumber } from '@/utils/format';
+import { formatMoneyInput, formatNumber, parseMoneyInput } from '@/utils/format';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { backendApi } from '@/services/backend';
 import { showAlert } from '@/utils/alert';
@@ -36,7 +36,19 @@ type Invoice = {
   con_no: number;
   trang_thai: string;
   ghi_chu?: string | null;
-  hop_dong: { ma_hop_dong: number; nguoi_thue?: string; phong?: string; ten_khu_tro?: string };
+  hop_dong: {
+    ma_hop_dong: number;
+    nguoi_thue?: string;
+    phong?: string;
+    so_phong?: string;
+    ten_khu_tro?: string;
+    dia_chi?: string;
+    dien_tich?: number | null;
+    tang?: number | null;
+    so_nguoi_dang_o?: number;
+    so_nguoi_toi_da?: number;
+    so_cho_con_lai?: number;
+  };
   thanh_toan: BillingPayment[];
 };
 
@@ -45,7 +57,17 @@ type Contract = {
   trang_thai: string;
   gia_thue: number;
   nguoi_thue?: { ho_ten?: string };
-  phong?: { tieu_de?: string; so_phong?: string; ten_khu_tro?: string };
+  phong?: {
+    tieu_de?: string;
+    so_phong?: string;
+    ten_khu_tro?: string;
+    dia_chi?: string;
+    dien_tich?: number | null;
+    tang?: number | null;
+    so_nguoi_dang_o?: number;
+    so_nguoi_toi_da?: number;
+    so_cho_con_lai?: number;
+  };
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -145,11 +167,11 @@ export default function BillingManagement({ tenantView = false }: { tenantView?:
         han_thanh_toan: dueDate,
         chi_so_dien_cu: electricityPrevious || 0,
         chi_so_dien_moi: electricityCurrent || 0,
-        don_gia_dien: electricityRate || 0,
+        don_gia_dien: parseMoneyInput(electricityRate),
         chi_so_nuoc_cu: waterPrevious || 0,
         chi_so_nuoc_moi: waterCurrent || 0,
-        don_gia_nuoc: waterRate || 0,
-        phi_khac: otherFee || 0,
+        don_gia_nuoc: parseMoneyInput(waterRate),
+        phi_khac: parseMoneyInput(otherFee),
         ghi_chu: invoiceNote.trim() || null,
       });
       setInvoiceContract(null);
@@ -166,7 +188,7 @@ export default function BillingManagement({ tenantView = false }: { tenantView?:
     const available = Math.max(0, Number(invoice.con_no) - Number(invoice.cho_xac_nhan));
     setPaymentInvoice(invoice);
     setRecordAsLandlord(asLandlord);
-    setPaymentAmount(String(available));
+    setPaymentAmount(formatMoneyInput(String(available)));
     setPaymentMethod(asLandlord ? 'Tiền mặt' : 'Chuyển khoản');
     setPaymentReference('');
     setPaymentNote('');
@@ -174,8 +196,8 @@ export default function BillingManagement({ tenantView = false }: { tenantView?:
 
   const submitPayment = async () => {
     if (!paymentInvoice) return;
-    const amount = Number(paymentAmount);
-    if (!Number.isInteger(amount) || amount <= 0) {
+    const amount = parseMoneyInput(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
       showAlert('Số tiền không hợp lệ', 'Nhập số tiền nguyên đồng lớn hơn 0.');
       return;
     }
@@ -235,7 +257,16 @@ export default function BillingManagement({ tenantView = false }: { tenantView?:
             <View key={contract.ma_hop_dong} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, padding: 12 }}>
               <View style={{ flex: 1, minWidth: 180 }}>
                 <Text style={{ color: '#1F2937', fontSize: 14, fontWeight: '600' }}>{contract.phong?.tieu_de || `Phòng ${contract.phong?.so_phong || ''}`}</Text>
-                <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 3 }}>{contract.nguoi_thue?.ho_ten || 'Người thuê'} · {formatMoney(contract.gia_thue)}/tháng</Text>
+                <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 3 }}>Hợp đồng #{contract.ma_hop_dong} · {contract.nguoi_thue?.ho_ten || 'Người thuê'} · {formatMoney(contract.gia_thue)}/tháng</Text>
+                <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 2 }}>
+                  {contract.phong?.ten_khu_tro || 'Khu trọ'}{contract.phong?.dia_chi ? ` · ${contract.phong.dia_chi}` : ''}
+                </Text>
+                <Text style={{ color: '#4B5563', fontSize: 12, marginTop: 2 }}>
+                  Phòng {contract.phong?.so_phong || '--'} · {contract.phong?.dien_tich ?? '--'} m² · Tầng {contract.phong?.tang ?? '--'}
+                </Text>
+                <Text style={{ color: '#4B5563', fontSize: 12, marginTop: 2 }}>
+                  Đang ở/giữ chỗ {contract.phong?.so_nguoi_dang_o ?? 0}/{contract.phong?.so_nguoi_toi_da ?? '--'} · Còn {contract.phong?.so_cho_con_lai ?? '--'} chỗ
+                </Text>
               </View>
               <TouchableOpacity onPress={() => resetInvoiceForm(contract)} style={{ backgroundColor: '#EAF3FF', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
                 <Text style={{ color: '#2563EB', fontSize: 13, fontWeight: '600' }}>Tạo hóa đơn</Text>
@@ -253,10 +284,20 @@ export default function BillingManagement({ tenantView = false }: { tenantView?:
           <View key={invoice.ma_hoa_don} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 14, gap: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: '#1F2937', fontSize: 15, fontWeight: '700' }}>Kỳ {String(invoice.ky_thanh_toan).slice(0, 7)} · {invoice.hop_dong?.phong || `Hợp đồng #${invoice.ma_hop_dong}`}</Text>
+                <Text style={{ color: '#1F2937', fontSize: 15, fontWeight: '700' }}>
+                  Kỳ {String(invoice.ky_thanh_toan).slice(0, 7)} · {invoice.hop_dong?.phong || `Hợp đồng #${invoice.ma_hop_dong}`}{invoice.hop_dong?.so_phong ? ` · Phòng ${invoice.hop_dong.so_phong}` : ''}
+                </Text>
                 {!tenantView && <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 3 }}>{invoice.hop_dong?.nguoi_thue || 'Người thuê'} · {invoice.hop_dong?.ten_khu_tro || 'Khu trọ'}</Text>}
               </View>
               <Text style={{ color: statusColor(invoice.trang_thai), fontSize: 12, fontWeight: '700' }}>{STATUS_LABEL[invoice.trang_thai] || invoice.trang_thai}</Text>
+            </View>
+            {!!invoice.hop_dong?.dia_chi && <Text style={{ color: '#4B5563', fontSize: 12 }}>Địa chỉ: {invoice.hop_dong.dia_chi}</Text>}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              <Text style={{ color: '#6B7280', fontSize: 12 }}>Diện tích: {invoice.hop_dong?.dien_tich ?? '--'} m²</Text>
+              <Text style={{ color: '#6B7280', fontSize: 12 }}>Tầng: {invoice.hop_dong?.tang ?? '--'}</Text>
+              <Text style={{ color: '#6B7280', fontSize: 12 }}>
+                Sức chứa: {invoice.hop_dong?.so_nguoi_dang_o ?? 0}/{invoice.hop_dong?.so_nguoi_toi_da ?? '--'} · còn {invoice.hop_dong?.so_cho_con_lai ?? '--'} chỗ
+              </Text>
             </View>
             <Text style={{ color: '#4B5563', fontSize: 13 }}>Hạn thanh toán: {String(invoice.han_thanh_toan).slice(0, 10)}</Text>
             <View style={{ borderTopWidth: 1, borderTopColor: '#F0F1F3', paddingTop: 8, gap: 4 }}>
@@ -308,26 +349,27 @@ export default function BillingManagement({ tenantView = false }: { tenantView?:
       </View>
 
       <Modal visible={!!invoiceContract} transparent animationType="fade" onRequestClose={() => setInvoiceContract(null)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 }}>
           <View style={{ width: '100%', maxWidth: 560, maxHeight: '92%', alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 8, padding: 18, gap: 10 }}>
             <Text style={{ color: '#111827', fontSize: 18, fontWeight: '700' }}>Lập hóa đơn điện nước</Text>
             <Text style={{ color: '#6B7280', fontSize: 13 }}>{invoiceContract?.phong?.tieu_de || `Hợp đồng #${invoiceContract?.ma_hop_dong}`}</Text>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 9 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ gap: 9 }}>
               <TextInput accessibilityLabel="Kỳ thanh toán" value={period} onChangeText={setPeriod} placeholder="Kỳ hóa đơn YYYY-MM" style={inputStyle} />
               <TextInput accessibilityLabel="Hạn thanh toán" value={dueDate} onChangeText={setDueDate} placeholder="Hạn YYYY-MM-DD" style={inputStyle} />
               <Text style={labelStyle}>Điện (kWh)</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TextInput accessibilityLabel="Chỉ số điện cũ" value={electricityPrevious} onChangeText={setElectricityPrevious} keyboardType="decimal-pad" placeholder="Số cũ" style={[inputStyle, { flex: 1 }]} />
                 <TextInput accessibilityLabel="Chỉ số điện mới" value={electricityCurrent} onChangeText={setElectricityCurrent} keyboardType="decimal-pad" placeholder="Số mới" style={[inputStyle, { flex: 1 }]} />
-                <TextInput accessibilityLabel="Đơn giá điện" value={electricityRate} onChangeText={setElectricityRate} keyboardType="numeric" placeholder="đ/kWh" style={[inputStyle, { flex: 1 }]} />
+                <TextInput accessibilityLabel="Đơn giá điện" value={electricityRate} onChangeText={(v) => setElectricityRate(formatMoneyInput(v))} keyboardType="numeric" placeholder="đ/kWh" style={[inputStyle, { flex: 1 }]} />
               </View>
               <Text style={labelStyle}>Nước (m³)</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TextInput accessibilityLabel="Chỉ số nước cũ" value={waterPrevious} onChangeText={setWaterPrevious} keyboardType="decimal-pad" placeholder="Số cũ" style={[inputStyle, { flex: 1 }]} />
                 <TextInput accessibilityLabel="Chỉ số nước mới" value={waterCurrent} onChangeText={setWaterCurrent} keyboardType="decimal-pad" placeholder="Số mới" style={[inputStyle, { flex: 1 }]} />
-                <TextInput accessibilityLabel="Đơn giá nước" value={waterRate} onChangeText={setWaterRate} keyboardType="numeric" placeholder="đ/m³" style={[inputStyle, { flex: 1 }]} />
+                <TextInput accessibilityLabel="Đơn giá nước" value={waterRate} onChangeText={(v) => setWaterRate(formatMoneyInput(v))} keyboardType="numeric" placeholder="đ/m³" style={[inputStyle, { flex: 1 }]} />
               </View>
-              <TextInput accessibilityLabel="Phí khác" value={otherFee} onChangeText={setOtherFee} keyboardType="numeric" placeholder="Phí khác (đ)" style={inputStyle} />
+              <TextInput accessibilityLabel="Phí khác" value={otherFee} onChangeText={(v) => setOtherFee(formatMoneyInput(v))} keyboardType="numeric" placeholder="Phí khác (đ)" style={inputStyle} />
               <TextInput accessibilityLabel="Ghi chú hóa đơn" value={invoiceNote} onChangeText={setInvoiceNote} placeholder="Ghi chú (không bắt buộc)" multiline style={[inputStyle, { minHeight: 68, textAlignVertical: 'top' }]} />
               <Text style={{ color: '#6B7280', fontSize: 12 }}>Tiền điện nước được tính theo mức tiêu thụ × đơn giá; tiền phòng lấy từ hợp đồng.</Text>
             </ScrollView>
@@ -339,14 +381,16 @@ export default function BillingManagement({ tenantView = false }: { tenantView?:
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={!!paymentInvoice} transparent animationType="fade" onRequestClose={() => setPaymentInvoice(null)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 }}>
           <View style={{ width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 8, padding: 18, gap: 10 }}>
             <Text style={{ color: '#111827', fontSize: 18, fontWeight: '700' }}>{recordAsLandlord ? 'Ghi nhận tiền đã thu' : 'Gửi khoản thanh toán'}</Text>
             <Text style={{ color: '#6B7280', fontSize: 13 }}>Còn nợ {formatMoney(paymentInvoice?.con_no || 0)}</Text>
-            <TextInput accessibilityLabel="Số tiền thanh toán" value={paymentAmount} onChangeText={setPaymentAmount} keyboardType="numeric" placeholder="Số tiền (đ)" style={inputStyle} />
+            <TextInput accessibilityLabel="Số tiền thanh toán" value={paymentAmount} onChangeText={(v) => setPaymentAmount(formatMoneyInput(v))} keyboardType="numeric" placeholder="Số tiền (đ)" style={inputStyle} />
             <Text style={labelStyle}>Phương thức</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {['Chuyển khoản', 'Tiền mặt'].map((method) => (
@@ -366,6 +410,7 @@ export default function BillingManagement({ tenantView = false }: { tenantView?:
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

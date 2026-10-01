@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { notifyUser } = require('../services/notifications');
+const { getRoomOccupancy, getRoomOccupancyMap } = require('../services/roomOccupancy');
 
 const parseFutureDateTime = (value) => {
   const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
@@ -42,7 +43,8 @@ const getAll = async (req, res) => {
   try {
     let sql = `
       SELECT dl.*, nd.ho_ten, nd.so_dien_thoai,
-             p.tieu_de AS phong_tieu_de, p.so_phong AS phong_so_phong, p.trang_thai AS phong_trang_thai,
+              p.tieu_de AS phong_tieu_de, p.so_phong AS phong_so_phong,
+              p.trang_thai AS phong_trang_thai, p.so_nguoi_toi_da,
              k.ten_khu_tro, k.dia_chi AS khu_tro_dia_chi,
              k.ma_chu_tro
       FROM dat_lich_xem dl
@@ -61,6 +63,7 @@ const getAll = async (req, res) => {
 
     sql += ' ORDER BY dl.thoi_gian_hen ASC, dl.ngay_tao DESC';
     const [rows] = await pool.query(sql, params);
+    const occupancyByRoom = await getRoomOccupancyMap(pool);
     res.json(rows.map((item) => ({
       ...item,
       phong_tro: {
@@ -68,6 +71,10 @@ const getAll = async (req, res) => {
         tieu_de: item.phong_tieu_de,
         so_phong: item.phong_so_phong,
         trang_thai: item.phong_trang_thai,
+        so_nguoi_dang_o: occupancyByRoom.get(Number(item.ma_phong)) || 0,
+        so_cho_con_lai: Math.max(0, Number(item.so_nguoi_toi_da || 1) - (occupancyByRoom.get(Number(item.ma_phong)) || 0)),
+        co_the_dat_thue: item.phong_trang_thai !== 'BaoTri'
+          && Number(item.so_nguoi_toi_da || 1) > (occupancyByRoom.get(Number(item.ma_phong)) || 0),
         ten_khu_tro: item.ten_khu_tro,
         dia_chi: item.khu_tro_dia_chi,
       },
@@ -90,7 +97,8 @@ const create = async (req, res) => {
     if (!phone || !/^[0-9+().\-\s]{8,20}$/.test(phone)) return res.status(400).json({ error: 'Số điện thoại không hợp lệ.' });
 
     const [roomRows] = await pool.query(
-      `SELECT p.ma_phong, p.trang_thai, p.trang_thai_duyet, k.ma_chu_tro
+            `SELECT p.ma_phong, p.trang_thai, p.trang_thai_duyet,
+              p.so_nguoi_toi_da, k.ma_chu_tro
        FROM phong_tro p JOIN khu_tro k ON k.ma_khu_tro = p.ma_khu_tro
        WHERE p.ma_phong = ? LIMIT 1`,
       [roomId]
@@ -98,7 +106,11 @@ const create = async (req, res) => {
     const room = roomRows[0];
     if (!room) return res.status(404).json({ error: 'Không tìm thấy phòng trọ.' });
     if (room.trang_thai_duyet !== 'DaDuyet') return res.status(400).json({ error: 'Phòng chưa được duyệt đăng.' });
-    if (room.trang_thai !== 'ConTrong') return res.status(409).json({ error: 'Phòng hiện không còn trống.' });
+    if (room.trang_thai === 'BaoTri') return res.status(409).json({ error: 'Phòng hiện đang bảo trì.' });
+    const occupied = await getRoomOccupancy(pool, roomId);
+    if (occupied >= Number(room.so_nguoi_toi_da || 1)) {
+      return res.status(409).json({ error: 'Phòng đã đủ người, không còn chỗ trống để xem thuê chung.' });
+    }
 
     const [duplicateRows] = await pool.query(
       `SELECT ma_dat_lich FROM dat_lich_xem
